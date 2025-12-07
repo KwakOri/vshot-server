@@ -1,0 +1,110 @@
+import sharp from 'sharp';
+import fs from 'fs/promises';
+import path from 'path';
+
+export interface MergeOptions {
+  layout: 'overlap' | 'side-by-side' | 'custom';
+  outputWidth?: number;
+  outputHeight?: number;
+}
+
+export class ImageMerger {
+  private uploadDir: string;
+
+  constructor(uploadDir: string) {
+    this.uploadDir = uploadDir;
+  }
+
+  async ensureUploadDir(): Promise<void> {
+    try {
+      await fs.access(this.uploadDir);
+    } catch {
+      await fs.mkdir(this.uploadDir, { recursive: true });
+      console.log(`[ImageMerger] Created upload directory: ${this.uploadDir}`);
+    }
+  }
+
+  async mergeImages(
+    guestImagePath: string,
+    hostImagePath: string,
+    outputPath: string,
+    options: MergeOptions = { layout: 'overlap' }
+  ): Promise<string> {
+    const { layout, outputWidth = 1920, outputHeight = 1080 } = options;
+
+    try {
+      if (layout === 'overlap') {
+        // Guest (실사) is background, Host (VTuber with alpha) is foreground
+        await sharp(guestImagePath)
+          .resize(outputWidth, outputHeight, { fit: 'cover' })
+          .composite([
+            {
+              input: await sharp(hostImagePath)
+                .resize(outputWidth, outputHeight, { fit: 'contain' })
+                .toBuffer(),
+              gravity: 'center'
+            }
+          ])
+          .png()
+          .toFile(outputPath);
+
+        console.log(`[ImageMerger] Merged images (overlap): ${outputPath}`);
+      } else if (layout === 'side-by-side') {
+        // Place images side by side
+        const halfWidth = Math.floor(outputWidth / 2);
+
+        const guestBuffer = await sharp(guestImagePath)
+          .resize(halfWidth, outputHeight, { fit: 'cover' })
+          .toBuffer();
+
+        const hostBuffer = await sharp(hostImagePath)
+          .resize(halfWidth, outputHeight, { fit: 'cover' })
+          .toBuffer();
+
+        await sharp({
+          create: {
+            width: outputWidth,
+            height: outputHeight,
+            channels: 4,
+            background: { r: 255, g: 255, b: 255, alpha: 1 }
+          }
+        })
+          .composite([
+            { input: guestBuffer, left: 0, top: 0 },
+            { input: hostBuffer, left: halfWidth, top: 0 }
+          ])
+          .png()
+          .toFile(outputPath);
+
+        console.log(`[ImageMerger] Merged images (side-by-side): ${outputPath}`);
+      }
+
+      return outputPath;
+    } catch (error) {
+      console.error('[ImageMerger] Error merging images:', error);
+      throw new Error('Failed to merge images');
+    }
+  }
+
+  async saveBase64Image(base64Data: string, filename: string): Promise<string> {
+    await this.ensureUploadDir();
+
+    // Remove data URL prefix if present
+    const base64String = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64String, 'base64');
+
+    const filePath = path.join(this.uploadDir, filename);
+    await fs.writeFile(filePath, buffer);
+
+    console.log(`[ImageMerger] Saved image: ${filePath}`);
+    return filePath;
+  }
+
+  getPublicUrl(filename: string): string {
+    return `/uploads/${filename}`;
+  }
+
+  getFilePath(filename: string): string {
+    return path.join(this.uploadDir, filename);
+  }
+}

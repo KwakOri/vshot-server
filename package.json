@@ -1,0 +1,35 @@
+{
+  "name": "vshot-v2-server",
+  "version": "1.0.0",
+  "description": "WebRTC Signaling Server + Image Merge API",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["webrtc", "signaling", "websocket"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.1",
+    "sharp": "^0.33.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/ws": "^8.5.8",
+    "@types/cors": "^2.8.15",
+    "@types/uuid": "^9.0.6",
+    "@types/node": "^20.9.0",
+    "typescript": "^5.2.2",
+    "tsx": "^4.6.0",
+    "eslint": "^8.53.0",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0"
+  }
+}
