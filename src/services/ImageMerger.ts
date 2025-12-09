@@ -2,8 +2,19 @@ import sharp from 'sharp';
 import fs from 'fs/promises';
 import path from 'path';
 
+export type AspectRatio = '16:9' | '4:3' | '3:4' | '9:16' | '1:1';
+
+export const ASPECT_RATIOS: Record<AspectRatio, { width: number; height: number }> = {
+  '16:9': { width: 1920, height: 1080 },
+  '4:3': { width: 1440, height: 1080 },
+  '3:4': { width: 1080, height: 1440 },
+  '9:16': { width: 1080, height: 1920 },
+  '1:1': { width: 1080, height: 1080 },
+};
+
 export interface MergeOptions {
   layout: 'overlap' | 'side-by-side' | 'custom';
+  aspectRatio?: AspectRatio;
   outputWidth?: number;
   outputHeight?: number;
 }
@@ -30,7 +41,12 @@ export class ImageMerger {
     outputPath: string,
     options: MergeOptions = { layout: 'overlap' }
   ): Promise<string> {
-    const { layout, outputWidth = 1920, outputHeight = 1080 } = options;
+    const { layout, aspectRatio = '16:9' } = options;
+
+    // Get dimensions from aspect ratio
+    const dimensions = ASPECT_RATIOS[aspectRatio];
+    const outputWidth = options.outputWidth || dimensions.width;
+    const outputHeight = options.outputHeight || dimensions.height;
 
     try {
       if (layout === 'overlap') {
@@ -48,7 +64,7 @@ export class ImageMerger {
           .png()
           .toFile(outputPath);
 
-        console.log(`[ImageMerger] Merged images (overlap): ${outputPath}`);
+        console.log(`[ImageMerger] Merged images (overlap) at ${outputWidth}x${outputHeight}: ${outputPath}`);
       } else if (layout === 'side-by-side') {
         // Place images side by side
         const halfWidth = Math.floor(outputWidth / 2);
@@ -76,7 +92,7 @@ export class ImageMerger {
           .png()
           .toFile(outputPath);
 
-        console.log(`[ImageMerger] Merged images (side-by-side): ${outputPath}`);
+        console.log(`[ImageMerger] Merged images (side-by-side) at ${outputWidth}x${outputHeight}: ${outputPath}`);
       }
 
       return outputPath;

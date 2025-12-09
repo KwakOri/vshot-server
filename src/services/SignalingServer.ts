@@ -83,6 +83,21 @@ export class SignalingServer {
       case 'chromakey-settings':
         this.handleChromakeySettings(message);
         break;
+      case 'session-settings':
+        this.handleSessionSettings(message);
+        break;
+      case 'video-frame-request':
+        this.handleVideoFrameRequest(message);
+        break;
+      case 'host-display-options':
+        this.handleHostDisplayOptions(message);
+        break;
+      case 'guest-display-options':
+        this.handleGuestDisplayOptions(message);
+        break;
+      case 'aspect-ratio-settings':
+        this.handleAspectRatioSettings(message);
+        break;
       default:
         console.warn('[Signaling] Unknown message type:', message);
     }
@@ -297,6 +312,79 @@ export class SignalingServer {
     });
 
     console.log(`[Signaling] Chromakey settings updated in room ${roomId}:`, settings);
+  }
+
+  private handleSessionSettings(message: { type: 'session-settings'; roomId: string; settings: { recordingDuration: number; captureInterval: number } }): void {
+    const { roomId, settings } = message;
+
+    // Store session settings in room
+    this.roomManager.updateSessionSettings(roomId, settings);
+
+    // Broadcast session settings to all clients in the room
+    this.broadcastToRoom(roomId, {
+      type: 'session-settings',
+      roomId,
+      settings
+    });
+
+    console.log(`[Signaling] Session settings updated in room ${roomId}:`, settings);
+  }
+
+  private handleVideoFrameRequest(message: { type: 'video-frame-request'; roomId: string; userId: string; selectedPhotos: number[] }): void {
+    const { roomId, userId, selectedPhotos } = message;
+
+    console.log(`[Signaling] Video frame request from ${userId} in room ${roomId}`);
+    console.log(`[Signaling] Selected photos:`, selectedPhotos);
+
+    // Broadcast to room (Host will receive this and start composition)
+    this.broadcastToRoom(roomId, {
+      type: 'video-frame-request',
+      roomId,
+      fromUserId: userId,
+      selectedPhotos
+    });
+  }
+
+  private handleHostDisplayOptions(message: { type: 'host-display-options'; roomId: string; options: { flipHorizontal: boolean } }): void {
+    const { roomId, options } = message;
+
+    // Broadcast host display options to all clients in the room
+    this.broadcastToRoom(roomId, {
+      type: 'host-display-options',
+      roomId,
+      options
+    });
+
+    console.log(`[Signaling] Host display options updated in room ${roomId}:`, options);
+  }
+
+  private handleGuestDisplayOptions(message: { type: 'guest-display-options'; roomId: string; options: { flipHorizontal: boolean } }): void {
+    const { roomId, options } = message;
+
+    // Broadcast guest display options to all clients in the room
+    this.broadcastToRoom(roomId, {
+      type: 'guest-display-options',
+      roomId,
+      options
+    });
+
+    console.log(`[Signaling] Guest display options updated in room ${roomId}:`, options);
+  }
+
+  private handleAspectRatioSettings(message: { type: 'aspect-ratio-settings'; roomId: string; settings: any }): void {
+    const { roomId, settings } = message;
+
+    // Store aspect ratio settings in room
+    this.roomManager.updateAspectRatioSettings(roomId, settings);
+
+    // Broadcast aspect ratio settings to all clients in the room
+    this.broadcastToRoom(roomId, {
+      type: 'aspect-ratio-settings',
+      roomId,
+      settings
+    });
+
+    console.log(`[Signaling] Aspect ratio settings updated in room ${roomId}:`, settings);
   }
 
   private handleDisconnect(ws: WebSocket): void {

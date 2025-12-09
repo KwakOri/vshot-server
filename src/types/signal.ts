@@ -14,13 +14,34 @@ export type SignalMessage =
   | { type: 'photos-merged'; roomId: string; photos: Array<{ photoNumber: number; mergedImageUrl: string }> }
   | { type: 'photo-select'; roomId: string; userId: string; selectedIndices: number[] }
   | { type: 'photo-select-sync'; roomId: string; userId: string; selectedIndices: number[] }
-  | { type: 'chromakey-settings'; roomId: string; settings: ChromaKeySettings };
+  | { type: 'chromakey-settings'; roomId: string; settings: ChromaKeySettings }
+  | { type: 'session-settings'; roomId: string; settings: SessionSettings }
+  | { type: 'host-display-options'; roomId: string; options: DisplayOptions }
+  | { type: 'guest-display-options'; roomId: string; options: DisplayOptions }
+  | { type: 'aspect-ratio-settings'; roomId: string; settings: AspectRatioSettings };
+
+export interface DisplayOptions {
+  flipHorizontal: boolean;
+}
 
 export interface ChromaKeySettings {
   enabled: boolean;
   color: string;
   similarity: number;
   smoothness: number;
+}
+
+export interface SessionSettings {
+  recordingDuration: number; // seconds
+  captureInterval: number; // seconds
+}
+
+export type AspectRatio = '16:9' | '4:3' | '3:4' | '9:16' | '1:1';
+
+export interface AspectRatioSettings {
+  ratio: AspectRatio;
+  width: number;
+  height: number;
 }
 
 export interface Room {
@@ -33,6 +54,8 @@ export interface Room {
     host: number[];
     guest: number[];
   };
+  sessionSettings?: SessionSettings;
+  aspectRatioSettings?: AspectRatioSettings;
 }
 
 export interface CapturedPhoto {

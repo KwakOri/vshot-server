@@ -106,6 +106,22 @@ export class RoomManager {
     console.log(`[RoomManager] ${role} selected photos updated:`, selectedIndices);
   }
 
+  updateSessionSettings(roomId: string, settings: { recordingDuration: number; captureInterval: number }): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.sessionSettings = settings;
+    console.log(`[RoomManager] Session settings updated for room ${roomId}:`, settings);
+  }
+
+  updateAspectRatioSettings(roomId: string, settings: any): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.aspectRatioSettings = settings;
+    console.log(`[RoomManager] Aspect ratio settings updated for room ${roomId}:`, settings);
+  }
+
   removeUser(userId: string): string | null {
     const roomId = this.userToRoom.get(userId);
     if (!roomId) return null;

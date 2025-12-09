@@ -10,7 +10,7 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
   // Upload photo (base64)
   router.post('/upload', async (req: Request, res: Response) => {
     try {
-      const { roomId, userId, photoNumber, imageData } = req.body;
+      const { roomId, userId, photoNumber, imageData, aspectRatio = '16:9' } = req.body;
 
       if (!roomId || !userId || photoNumber === undefined || !imageData) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -52,7 +52,10 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
               const mergedFilename = `${roomId}_merged_${photo.photoNumber}_${uuidv4()}.png`;
               const mergedPath = imageMerger.getFilePath(mergedFilename);
 
-              await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, { layout: 'overlap' });
+              await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, {
+                layout: 'overlap',
+                aspectRatio: aspectRatio as any
+              });
 
               const mergedUrl = imageMerger.getPublicUrl(mergedFilename);
               roomManager.updateMergedPhotoUrl(roomId, photo.photoNumber, mergedUrl);
@@ -99,7 +102,7 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
   // Merge photos
   router.post('/merge', async (req: Request, res: Response) => {
     try {
-      const { roomId, photoNumber, layout = 'overlap' } = req.body;
+      const { roomId, photoNumber, layout = 'overlap', aspectRatio = '16:9' } = req.body;
 
       if (!roomId || photoNumber === undefined) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -121,7 +124,10 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
       const mergedFilename = `${roomId}_merged_${photoNumber}_${uuidv4()}.png`;
       const mergedPath = imageMerger.getFilePath(mergedFilename);
 
-      await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, { layout });
+      await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, {
+        layout,
+        aspectRatio: aspectRatio as any
+      });
 
       const publicUrl = imageMerger.getPublicUrl(mergedFilename);
       roomManager.updateMergedPhotoUrl(roomId, photoNumber, publicUrl);

@@ -7,6 +7,8 @@ import { SignalingServer } from './services/SignalingServer';
 import { RoomManager } from './services/RoomManager';
 import { ImageMerger } from './services/ImageMerger';
 import { createPhotoRouter } from './routes/photo';
+import { createVideoRouter } from './routes/video';
+import { apiKeyAuth } from './middleware/apiKeyAuth';
 
 // Load environment variables
 dotenv.config();
@@ -26,6 +28,10 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Increase limit for video uploads
+app.use('/api/video/upload', express.json({ limit: '100mb' }));
+app.use('/api/video/upload', express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(STORAGE_PATH));
@@ -66,8 +72,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ICE Servers configuration endpoint
-app.get('/api/ice-servers', (req, res) => {
+// ICE Servers configuration endpoint (requires authentication)
+app.get('/api/ice-servers', apiKeyAuth, (req, res) => {
   const iceServers: Array<{ urls: string; username?: string; credential?: string }> = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -86,8 +92,9 @@ app.get('/api/ice-servers', (req, res) => {
   res.json({ iceServers });
 });
 
-// API Routes
-app.use('/api/photo', createPhotoRouter(imageMerger, roomManager, signalingServer));
+// API Routes (protected with API key authentication)
+app.use('/api/photo', apiKeyAuth, createPhotoRouter(imageMerger, roomManager, signalingServer));
+app.use('/api/video', apiKeyAuth, createVideoRouter(signalingServer));
 
 // 404 handler
 app.use((req, res) => {
