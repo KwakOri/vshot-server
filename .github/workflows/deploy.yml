@@ -66,11 +66,18 @@ jobs:
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # Upload deployment package
-          scp deploy.tar.gz deploy-server:$DEPLOY_PATH/
+          # Verify deployment package exists
+          ls -lh deploy.tar.gz
+
+          # Upload deployment package with verbose output
+          echo "Uploading to $DEPLOY_PATH..."
+          scp -v deploy.tar.gz deploy-server:$DEPLOY_PATH/
+
+          # Verify upload
+          ssh deploy-server "ls -lh $DEPLOY_PATH/deploy.tar.gz"
 
           # Execute deployment script on server
-          ssh deploy-server << 'ENDSSH'
+          ssh deploy-server "DEPLOY_PATH=$DEPLOY_PATH bash -s" << 'ENDSSH'
             set -e
 
             # Navigate to deployment directory
