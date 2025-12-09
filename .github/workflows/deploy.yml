@@ -34,6 +34,10 @@ jobs:
           if [ -f "ecosystem.config.js" ]; then
             cp ecosystem.config.js deploy/
           fi
+          # Copy scripts directory
+          if [ -d "scripts" ]; then
+            cp -r scripts deploy/
+          fi
           cp -r node_modules deploy/ || true
           tar -czf deploy.tar.gz -C deploy .
 
