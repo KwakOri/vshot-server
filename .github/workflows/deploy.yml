@@ -30,6 +30,10 @@ jobs:
         run: |
           mkdir -p deploy
           cp -r dist package.json package-lock.json deploy/
+          # Copy ecosystem.config.js if exists
+          if [ -f "ecosystem.config.js" ]; then
+            cp ecosystem.config.js deploy/
+          fi
           cp -r node_modules deploy/ || true
           tar -czf deploy.tar.gz -C deploy .
 
@@ -103,18 +107,31 @@ jobs:
 
             # Install production dependencies
             cd current
-            npm ci --production
+            npm ci --omit=dev
 
-            # Restart service
-            if command -v systemctl &> /dev/null; then
+            # Restart service (check PM2 first)
+            if command -v pm2 &> /dev/null; then
+              echo "Restarting with PM2..."
+              if pm2 list | grep -q vshot-server; then
+                pm2 restart vshot-server
+              else
+                # Use ecosystem.config.js if available, otherwise direct start
+                if [ -f "ecosystem.config.js" ]; then
+                  pm2 start ecosystem.config.js
+                else
+                  pm2 start dist/index.js --name vshot-server
+                fi
+              fi
+              pm2 save
+            elif systemctl list-units --full --all | grep -q vshot-signaling.service; then
+              echo "Restarting with systemd..."
               sudo systemctl restart vshot-signaling
-            elif command -v pm2 &> /dev/null; then
-              pm2 restart vshot-signaling || pm2 start dist/index.js --name vshot-signaling
             else
-              echo "No process manager found. Please restart manually."
+              echo "⚠️  No process manager found. Please restart manually."
+              exit 1
             fi
 
-            echo "Deployment completed successfully"
+            echo "✅ Deployment completed successfully"
           ENDSSH
 
       - name: Health check
