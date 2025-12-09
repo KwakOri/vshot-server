@@ -16,6 +16,7 @@ export type SignalMessage =
   | { type: 'photo-select-sync'; roomId: string; userId: string; selectedIndices: number[] }
   | { type: 'chromakey-settings'; roomId: string; settings: ChromaKeySettings }
   | { type: 'session-settings'; roomId: string; settings: SessionSettings }
+  | { type: 'video-frame-request'; roomId: string; userId: string; selectedPhotos: number[] }
   | { type: 'host-display-options'; roomId: string; options: DisplayOptions }
   | { type: 'guest-display-options'; roomId: string; options: DisplayOptions }
   | { type: 'aspect-ratio-settings'; roomId: string; settings: AspectRatioSettings };
