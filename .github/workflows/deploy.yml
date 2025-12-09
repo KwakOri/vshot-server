@@ -40,21 +40,37 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          # Write SSH key (preserve newlines)
+          printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+
+          # Verify key format
+          if ! ssh-keygen -l -f ~/.ssh/deploy_key; then
+            echo "Error: Invalid SSH private key format"
+            exit 1
+          fi
+
+          # Add host to known_hosts
           ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+
+          # Configure SSH
+          cat >> ~/.ssh/config << EOF
+          Host deploy-server
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          EOF
 
       - name: Deploy to Vultr
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           # Upload deployment package
-          scp -i ~/.ssh/deploy_key deploy.tar.gz $SSH_USER@$SSH_HOST:$DEPLOY_PATH/
+          scp deploy.tar.gz deploy-server:$DEPLOY_PATH/
 
           # Execute deployment script on server
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
+          ssh deploy-server << 'ENDSSH'
             set -e
 
             # Navigate to deployment directory
