@@ -103,6 +103,51 @@ CORS_ORIGIN=http://localhost:3000
 STORAGE_PATH=./uploads
 ```
 
+## Deployment
+
+### 🚀 Quick Deploy to Vultr
+
+자동 배포 설정:
+
+```bash
+# 1. Vultr 서버에서 초기 설정
+sudo bash scripts/setup-server.sh
+
+# 2. GitHub Secrets 설정 (4개)
+# - SSH_PRIVATE_KEY
+# - SSH_HOST
+# - SSH_USER
+# - DEPLOY_PATH
+
+# 3. main 브랜치에 푸시하면 자동 배포
+git push origin main
+```
+
+📖 **자세한 가이드:**
+- [빠른 시작 (5분)](./QUICKSTART.md)
+- [상세 배포 가이드](./DEPLOYMENT.md)
+
+### GitHub Actions
+
+이 저장소는 GitHub Actions를 통한 자동 배포를 지원합니다:
+
+- **트리거**: `main` 브랜치 push
+- **프로세스**: 빌드 → 전송 → 배포 → 재시작
+- **서비스 관리**: systemd 또는 PM2
+
+## Production Checklist
+
+배포 전 확인사항:
+
+- [ ] `.env` 파일 설정 완료
+- [ ] `CORS_ORIGIN` 프로덕션 도메인으로 설정
+- [ ] `API_KEY` 강력한 값으로 설정
+- [ ] 방화벽 포트 개방 (3000/tcp)
+- [ ] TURN 서버 설정 (옵션)
+- [ ] SSL/TLS 인증서 설정 (권장)
+- [ ] 로그 모니터링 설정
+- [ ] 백업 전략 수립
+
 ## License
 
 ISC

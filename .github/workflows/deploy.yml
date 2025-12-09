@@ -1,0 +1,114 @@
+name: Deploy to Vultr
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy
+          cp -r dist package.json package-lock.json deploy/
+          cp -r node_modules deploy/ || true
+          tar -czf deploy.tar.gz -C deploy .
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+
+      - name: Deploy to Vultr
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          # Upload deployment package
+          scp -i ~/.ssh/deploy_key deploy.tar.gz $SSH_USER@$SSH_HOST:$DEPLOY_PATH/
+
+          # Execute deployment script on server
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+
+            # Navigate to deployment directory
+            cd $DEPLOY_PATH
+
+            # Backup current version
+            if [ -d "current" ]; then
+              timestamp=$(date +%Y%m%d_%H%M%S)
+              mv current backup_$timestamp
+              # Keep only last 3 backups
+              ls -t backup_* | tail -n +4 | xargs -r rm -rf
+            fi
+
+            # Extract new version
+            mkdir -p current
+            tar -xzf deploy.tar.gz -C current
+            rm deploy.tar.gz
+
+            # Copy environment file
+            if [ -f ".env" ]; then
+              cp .env current/.env
+            fi
+
+            # Install production dependencies
+            cd current
+            npm ci --production
+
+            # Restart service
+            if command -v systemctl &> /dev/null; then
+              sudo systemctl restart vshot-signaling
+            elif command -v pm2 &> /dev/null; then
+              pm2 restart vshot-signaling || pm2 start dist/index.js --name vshot-signaling
+            else
+              echo "No process manager found. Please restart manually."
+            fi
+
+            echo "Deployment completed successfully"
+          ENDSSH
+
+      - name: Health check
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          HEALTH_CHECK_URL: ${{ secrets.HEALTH_CHECK_URL }}
+        run: |
+          sleep 5
+          if [ -n "$HEALTH_CHECK_URL" ]; then
+            curl -f $HEALTH_CHECK_URL || echo "Warning: Health check failed"
+          fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful"
+          else
+            echo "❌ Deployment failed"
+          fi
