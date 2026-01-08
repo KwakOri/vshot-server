@@ -57,6 +57,7 @@ export interface Room {
   };
   sessionSettings?: SessionSettings;
   aspectRatioSettings?: AspectRatioSettings;
+  deletionTimerId?: NodeJS.Timeout; // Timer for delayed room deletion
 }
 
 export interface CapturedPhoto {

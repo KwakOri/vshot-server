@@ -113,18 +113,45 @@ export class SignalingServer {
     }
 
     let success = false;
+    let finalRoomId = roomId;
 
     if (role === 'host') {
-      // Host creates a room
-      const newRoomId = this.roomManager.createRoom(userId);
-      this.clients.set(userId, { ws, userId, roomId: newRoomId, role: 'host' });
-      ws.send(JSON.stringify({
-        type: 'joined',
-        roomId: newRoomId,
-        role: 'host',
-        userId
-      }));
-      success = true;
+      // Check if host is trying to rejoin an existing room
+      if (roomId && roomId.trim() !== '') {
+        success = this.roomManager.rejoinRoomAsHost(roomId, userId);
+
+        if (success) {
+          // Successfully rejoined existing room
+          finalRoomId = roomId;
+        } else {
+          // Rejoin failed - create new room
+          finalRoomId = this.roomManager.createRoom(userId);
+          success = true;
+        }
+      } else {
+        // No roomId provided - create new room
+        finalRoomId = this.roomManager.createRoom(userId);
+        success = true;
+      }
+
+      if (success) {
+        this.clients.set(userId, { ws, userId, roomId: finalRoomId, role: 'host' });
+
+        const room = this.roomManager.getRoom(finalRoomId);
+        const response: any = {
+          type: 'joined',
+          roomId: finalRoomId,
+          role: 'host',
+          userId
+        };
+
+        // If there's a guest in the room (after rejoin), notify host
+        if (room && room.guestId) {
+          response.guestId = room.guestId;
+        }
+
+        ws.send(JSON.stringify(response));
+      }
     } else {
       // Guest joins existing room
       success = this.roomManager.joinRoom(roomId, userId);
@@ -161,7 +188,7 @@ export class SignalingServer {
       }
     }
 
-    console.log(`[Signaling] ${role} ${userId} ${success ? 'joined' : 'failed to join'} room ${roomId}`);
+    console.log(`[Signaling] ${role} ${userId} ${success ? 'joined' : 'failed to join'} room ${finalRoomId || roomId}`);
   }
 
   private handleWebRTCSignal(message: { roomId: string; from: string; to: string } & any): void {

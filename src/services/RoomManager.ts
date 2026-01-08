@@ -26,6 +26,31 @@ export class RoomManager {
     return roomId;
   }
 
+  rejoinRoomAsHost(roomId: string, hostId: string): boolean {
+    const room = this.rooms.get(roomId);
+
+    if (!room) {
+      console.log(`[RoomManager] Room not found for rejoin: ${roomId}`);
+      return false;
+    }
+
+    if (room.hostId !== hostId) {
+      console.log(`[RoomManager] Host ID mismatch for room ${roomId}`);
+      return false;
+    }
+
+    // Cancel scheduled deletion if exists
+    if (room.deletionTimerId) {
+      clearTimeout(room.deletionTimerId);
+      room.deletionTimerId = undefined;
+    }
+
+    // Room exists and hostId matches - allow rejoin
+    this.userToRoom.set(hostId, roomId);
+    console.log(`[RoomManager] Host ${hostId} rejoined room: ${roomId}`);
+    return true;
+  }
+
   joinRoom(roomId: string, guestId: string): boolean {
     const room = this.rooms.get(roomId);
 
@@ -130,15 +155,27 @@ export class RoomManager {
     if (!room) return null;
 
     if (room.hostId === userId) {
-      // Host left - delete room
-      this.rooms.delete(roomId);
+      // Host left - schedule room deletion after grace period (30 seconds)
       this.userToRoom.delete(userId);
-      if (room.guestId) {
-        this.userToRoom.delete(room.guestId);
+
+      // Cancel any existing deletion timer
+      if (room.deletionTimerId) {
+        clearTimeout(room.deletionTimerId);
       }
-      console.log(`[RoomManager] Room ${roomId} deleted (host left)`);
+
+      // Schedule deletion after 30 seconds
+      const GRACE_PERIOD_MS = 30000; // 30 seconds
+      room.deletionTimerId = setTimeout(() => {
+        console.log(`[RoomManager] Grace period expired, deleting room ${roomId}`);
+        this.rooms.delete(roomId);
+        if (room.guestId) {
+          this.userToRoom.delete(room.guestId);
+        }
+      }, GRACE_PERIOD_MS);
+
+      console.log(`[RoomManager] Host left room ${roomId}, scheduled deletion in 30s`);
     } else if (room.guestId === userId) {
-      // Guest left - clear guest
+      // Guest left - clear guest immediately
       room.guestId = null;
       this.userToRoom.delete(userId);
       console.log(`[RoomManager] Guest left room ${roomId}`);
