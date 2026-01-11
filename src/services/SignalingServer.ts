@@ -98,6 +98,9 @@ export class SignalingServer {
       case 'aspect-ratio-settings':
         this.handleAspectRatioSettings(message);
         break;
+      case 'frame-layout-settings':
+        this.handleFrameLayoutSettings(message);
+        break;
       default:
         console.warn('[Signaling] Unknown message type:', message);
     }
@@ -412,6 +415,22 @@ export class SignalingServer {
     });
 
     console.log(`[Signaling] Aspect ratio settings updated in room ${roomId}:`, settings);
+  }
+
+  private handleFrameLayoutSettings(message: { type: 'frame-layout-settings'; roomId: string; settings: any }): void {
+    const { roomId, settings } = message;
+
+    // Store frame layout settings in room
+    this.roomManager.updateFrameLayoutSettings(roomId, settings);
+
+    // Broadcast frame layout settings to all clients in the room
+    this.broadcastToRoom(roomId, {
+      type: 'frame-layout-settings',
+      roomId,
+      settings
+    });
+
+    console.log(`[Signaling] Frame layout settings updated in room ${roomId}:`, settings);
   }
 
   private handleDisconnect(ws: WebSocket): void {

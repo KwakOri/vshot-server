@@ -147,6 +147,14 @@ export class RoomManager {
     console.log(`[RoomManager] Aspect ratio settings updated for room ${roomId}:`, settings);
   }
 
+  updateFrameLayoutSettings(roomId: string, settings: any): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.frameLayoutSettings = settings;
+    console.log(`[RoomManager] Frame layout settings updated for room ${roomId}:`, settings);
+  }
+
   removeUser(userId: string): string | null {
     const roomId = this.userToRoom.get(userId);
     if (!roomId) return null;

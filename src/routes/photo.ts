@@ -33,14 +33,15 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
 
       console.log(`[PhotoAPI] ${role} uploaded photo ${photoNumber} for room ${roomId}`);
 
-      // Check if ALL 16 photos (8 host + 8 guest) are now uploaded
-      const allPhotosUploaded = room.capturedPhotos.length === 8 &&
+      // Check if ALL photos are now uploaded (based on frame layout settings)
+      const expectedPhotoCount = room.frameLayoutSettings?.totalPhotos || 8;
+      const allPhotosUploaded = room.capturedPhotos.length === expectedPhotoCount &&
         room.capturedPhotos.every(p => p.hostImageUrl && p.guestImageUrl);
 
       if (allPhotosUploaded) {
-        console.log(`[PhotoAPI] All photos uploaded for room ${roomId}, starting batch merge...`);
+        console.log(`[PhotoAPI] All ${expectedPhotoCount} photos uploaded for room ${roomId}, starting batch merge...`);
 
-        // Merge all 8 photos
+        // Merge all photos
         const mergedPhotos: Array<{ photoNumber: number; mergedImageUrl: string }> = [];
 
         for (const photo of room.capturedPhotos) {

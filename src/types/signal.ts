@@ -19,7 +19,8 @@ export type SignalMessage =
   | { type: 'video-frame-request'; roomId: string; userId: string; selectedPhotos: number[] }
   | { type: 'host-display-options'; roomId: string; options: DisplayOptions }
   | { type: 'guest-display-options'; roomId: string; options: DisplayOptions }
-  | { type: 'aspect-ratio-settings'; roomId: string; settings: AspectRatioSettings };
+  | { type: 'aspect-ratio-settings'; roomId: string; settings: AspectRatioSettings }
+  | { type: 'frame-layout-settings'; roomId: string; settings: FrameLayoutSettings };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;
@@ -45,6 +46,13 @@ export interface AspectRatioSettings {
   height: number;
 }
 
+export interface FrameLayoutSettings {
+  layoutId: string;
+  slotCount: number;
+  totalPhotos: number;
+  selectablePhotos: number;
+}
+
 export interface Room {
   id: string;
   hostId: string;
@@ -57,6 +65,7 @@ export interface Room {
   };
   sessionSettings?: SessionSettings;
   aspectRatioSettings?: AspectRatioSettings;
+  frameLayoutSettings?: FrameLayoutSettings;
   deletionTimerId?: NodeJS.Timeout; // Timer for delayed room deletion
 }
 
