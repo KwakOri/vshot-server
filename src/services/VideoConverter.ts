@@ -69,7 +69,7 @@ export class VideoConverter {
             onProgress({
               percent: Math.round(progress.percent * 10) / 10,
               currentTime: progress.timemark || '00:00:00',
-              targetSize: progress.targetSize || '0kB',
+              targetSize: String(progress.targetSize || '0kB'),
             });
           }
         })
