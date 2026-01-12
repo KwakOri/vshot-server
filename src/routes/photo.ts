@@ -10,7 +10,7 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
   // Upload photo (base64)
   router.post('/upload', async (req: Request, res: Response) => {
     try {
-      const { roomId, userId, photoNumber, imageData, aspectRatio = '16:9' } = req.body;
+      const { roomId, userId, photoNumber, imageData } = req.body;
 
       if (!roomId || !userId || photoNumber === undefined || !imageData) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -28,10 +28,17 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
       const filePath = await imageMerger.saveBase64Image(imageData, filename);
       const publicUrl = imageMerger.getPublicUrl(filename);
 
+      // Log image data size for debugging
+      const base64Length = imageData.replace(/^data:image\/\w+;base64,/, '').length;
+      const estimatedSize = (base64Length * 0.75) / 1024 / 1024; // MB
+      console.log(`[PhotoAPI] ${role} uploaded photo ${photoNumber} for room ${roomId}:`, {
+        filename,
+        estimatedSizeMB: estimatedSize.toFixed(2),
+        base64Preview: imageData.substring(0, 50) + '...',
+      });
+
       // Update room with uploaded image URL
       roomManager.updatePhotoUrl(roomId, photoNumber, role, publicUrl);
-
-      console.log(`[PhotoAPI] ${role} uploaded photo ${photoNumber} for room ${roomId}`);
 
       // Check if ALL photos are now uploaded (based on frame layout settings)
       const expectedPhotoCount = room.frameLayoutSettings?.totalPhotos || 8;
@@ -55,7 +62,8 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
 
               await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, {
                 layout: 'overlap',
-                aspectRatio: aspectRatio as any
+                outputWidth: 3000,  // Match input resolution (2:3 ratio)
+                outputHeight: 4500,
               });
 
               const mergedUrl = imageMerger.getPublicUrl(mergedFilename);
@@ -103,7 +111,7 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
   // Merge photos
   router.post('/merge', async (req: Request, res: Response) => {
     try {
-      const { roomId, photoNumber, layout = 'overlap', aspectRatio = '16:9' } = req.body;
+      const { roomId, photoNumber, layout = 'overlap' } = req.body;
 
       if (!roomId || photoNumber === undefined) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -127,7 +135,8 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
 
       await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, {
         layout,
-        aspectRatio: aspectRatio as any
+        outputWidth: 3000,  // Match input resolution (2:3 ratio)
+        outputHeight: 4500,
       });
 
       const publicUrl = imageMerger.getPublicUrl(mergedFilename);

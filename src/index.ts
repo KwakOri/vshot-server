@@ -26,12 +26,21 @@ app.use(cors({
   origin: CORS_ORIGIN,
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// IMPORTANT: Route-specific body parsers MUST come BEFORE global body parser
+// to avoid the global limit being applied first
+
+// Increase limit for photo uploads (high-resolution images can be large when base64 encoded)
+app.use('/api/photo/upload', express.json({ limit: '50mb' }));
+app.use('/api/photo/upload', express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Increase limit for video uploads
 app.use('/api/video/upload', express.json({ limit: '100mb' }));
 app.use('/api/video/upload', express.urlencoded({ extended: true, limit: '100mb' }));
+
+// Global body parser with default 10mb limit (for all other routes)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(STORAGE_PATH));

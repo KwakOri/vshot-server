@@ -49,6 +49,27 @@ export class ImageMerger {
     const outputHeight = options.outputHeight || dimensions.height;
 
     try {
+      // Log input image dimensions for debugging
+      const guestMetadata = await sharp(guestImagePath).metadata();
+      const hostMetadata = await sharp(hostImagePath).metadata();
+
+      console.log(`[ImageMerger] Merging images:`, {
+        guest: {
+          path: guestImagePath,
+          size: `${guestMetadata.width}x${guestMetadata.height}`,
+          format: guestMetadata.format,
+        },
+        host: {
+          path: hostImagePath,
+          size: `${hostMetadata.width}x${hostMetadata.height}`,
+          format: hostMetadata.format,
+        },
+        output: {
+          size: `${outputWidth}x${outputHeight}`,
+          layout,
+        },
+      });
+
       if (layout === 'overlap') {
         // Guest (실사) is background, Host (VTuber with alpha) is foreground
         await sharp(guestImagePath)
@@ -64,7 +85,7 @@ export class ImageMerger {
           .png()
           .toFile(outputPath);
 
-        console.log(`[ImageMerger] Merged images (overlap) at ${outputWidth}x${outputHeight}: ${outputPath}`);
+        console.log(`[ImageMerger] ✅ Merged images (overlap) at ${outputWidth}x${outputHeight}: ${outputPath}`);
       } else if (layout === 'side-by-side') {
         // Place images side by side
         const halfWidth = Math.floor(outputWidth / 2);

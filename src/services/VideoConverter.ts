@@ -51,9 +51,12 @@ export class VideoConverter {
         .videoCodec('libx264')
         // Preset: faster = quicker encoding, still good quality
         .outputOptions([
+          '-profile:v baseline', // QuickTime compatibility
+          '-level 3.0', // Compatibility level
           '-preset fast',
           '-crf 23', // Quality: 18-28 (lower = better, 23 = default)
           '-movflags +faststart', // Enable streaming (moov atom at start)
+          '-brand mp42', // MP4 v2 brand for better compatibility
         ])
         // Audio codec: AAC (most compatible)
         .audioCodec('aac')
