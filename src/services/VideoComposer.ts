@@ -64,48 +64,65 @@ export interface ComposeResult {
 }
 
 /**
- * Predefined frame layouts (matching client-side layouts)
+ * Video composition resolution (matches client RESOLUTION.VIDEO_WIDTH/HEIGHT)
+ * Videos are recorded at this resolution — composition should match.
+ * Photo layouts (3000×4500) are for still image capture only.
+ */
+const VIDEO_WIDTH = 720;
+const VIDEO_HEIGHT = 1080;
+
+/**
+ * Scale a photo-resolution layout (3000×4500) to video resolution (720×1080)
+ * Both share the same 2:3 aspect ratio, so a single scale factor applies.
+ */
+function scaleLayout(
+  id: string,
+  label: string,
+  slotCount: number,
+  photoPositions: FramePosition[],
+  photoCanvasWidth: number,
+  backgroundColor: string = '#1a1a2e',
+  frameSrc?: string,
+): FrameLayout {
+  const scale = VIDEO_WIDTH / photoCanvasWidth;
+  return {
+    id,
+    label,
+    slotCount,
+    positions: photoPositions.map((pos) => ({
+      x: Math.round(pos.x * scale),
+      y: Math.round(pos.y * scale),
+      width: Math.round(pos.width * scale),
+      height: Math.round(pos.height * scale),
+      zIndex: pos.zIndex,
+    })),
+    canvasWidth: VIDEO_WIDTH,
+    canvasHeight: VIDEO_HEIGHT,
+    backgroundColor,
+    frameSrc,
+  };
+}
+
+/**
+ * Predefined frame layouts for video composition (720×1080)
+ * Scaled from photo layouts (3000×4500) to match recorded video resolution.
  */
 export const FRAME_LAYOUTS: Record<string, FrameLayout> = {
-  '4cut-grid': {
-    id: '4cut-grid',
-    label: '인생네컷 (2x2)',
-    slotCount: 4,
-    positions: [
-      { x: 40, y: 40, width: 1450, height: 2200, zIndex: 0 },
-      { x: 1510, y: 40, width: 1450, height: 2200, zIndex: 1 },
-      { x: 40, y: 2260, width: 1450, height: 2200, zIndex: 2 },
-      { x: 1510, y: 2260, width: 1450, height: 2200, zIndex: 3 },
-    ],
-    canvasWidth: 3000,
-    canvasHeight: 4500,
-    backgroundColor: '#1a1a2e',
-  },
-  '1cut-polaroid': {
-    id: '1cut-polaroid',
-    label: '폴라로이드 (단일)',
-    slotCount: 1,
-    positions: [
-      { x: 40, y: 40, width: 2920, height: 4420, zIndex: 0 },
-    ],
-    canvasWidth: 3000,
-    canvasHeight: 4500,
-    backgroundColor: '#1a1a2e',
-  },
-  '4cut-quoka': {
-    id: '4cut-quoka',
-    label: '쿼카 4컷',
-    slotCount: 4,
-    positions: [
-      { x: 153, y: 1068, width: 1280, height: 1520, zIndex: 0 },
-      { x: 153, y: 2673, width: 1280, height: 1520, zIndex: 1 },
-      { x: 1587, y: 307, width: 1280, height: 1520, zIndex: 2 },
-      { x: 1587, y: 1912, width: 1280, height: 1520, zIndex: 3 },
-    ],
-    canvasWidth: 3000,
-    canvasHeight: 4500,
-    backgroundColor: '#1a1a2e',
-  },
+  '4cut-grid': scaleLayout('4cut-grid', '인생네컷 (2x2)', 4, [
+    { x: 40, y: 40, width: 1450, height: 2200, zIndex: 0 },
+    { x: 1510, y: 40, width: 1450, height: 2200, zIndex: 1 },
+    { x: 40, y: 2260, width: 1450, height: 2200, zIndex: 2 },
+    { x: 1510, y: 2260, width: 1450, height: 2200, zIndex: 3 },
+  ], 3000),
+  '1cut-polaroid': scaleLayout('1cut-polaroid', '폴라로이드 (단일)', 1, [
+    { x: 40, y: 40, width: 2920, height: 4420, zIndex: 0 },
+  ], 3000),
+  '4cut-quoka': scaleLayout('4cut-quoka', '쿼카 4컷', 4, [
+    { x: 153, y: 1068, width: 1280, height: 1520, zIndex: 0 },
+    { x: 153, y: 2673, width: 1280, height: 1520, zIndex: 1 },
+    { x: 1587, y: 307, width: 1280, height: 1520, zIndex: 2 },
+    { x: 1587, y: 1912, width: 1280, height: 1520, zIndex: 3 },
+  ], 3000),
 };
 
 /**
