@@ -8,6 +8,7 @@ import { RoomManager } from './services/RoomManager';
 import { ImageMerger } from './services/ImageMerger';
 import { createPhotoRouter } from './routes/photo';
 import { createVideoRouter } from './routes/video';
+import { createTestProcessRouter } from './routes/test-process';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 
 // Load environment variables
@@ -38,12 +39,19 @@ app.use('/api/photo/upload', express.urlencoded({ extended: true, limit: '50mb' 
 app.use('/api/video/upload', express.json({ limit: '100mb' }));
 app.use('/api/video/upload', express.urlencoded({ extended: true, limit: '100mb' }));
 
+// Increase limit for test API (photo batch can be large)
+app.use('/api/test', express.json({ limit: '100mb' }));
+app.use('/api/test', express.urlencoded({ extended: true, limit: '100mb' }));
+
 // Global body parser with default 10mb limit (for all other routes)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(STORAGE_PATH));
+
+// Serve test uploads (for FirmTestPage)
+app.use('/uploads/test', express.static(path.join(STORAGE_PATH, 'test')));
 
 // Initialize services
 const roomManager = new RoomManager();
@@ -104,6 +112,9 @@ app.get('/api/ice-servers', apiKeyAuth, (req, res) => {
 // API Routes (protected with API key authentication)
 app.use('/api/photo', apiKeyAuth, createPhotoRouter(imageMerger, roomManager, signalingServer));
 app.use('/api/video', apiKeyAuth, createVideoRouter(signalingServer));
+
+// Test API Routes (for FirmTestPage - independent of RoomManager)
+app.use('/api/test', apiKeyAuth, createTestProcessRouter(imageMerger));
 
 // 404 handler
 app.use((req, res) => {
