@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ImageMerger } from '../services/ImageMerger';
 import { VideoConverter } from '../services/VideoConverter';
+import { VideoComposer, FRAME_LAYOUTS } from '../services/VideoComposer';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
@@ -429,6 +430,158 @@ export function createTestProcessRouter(imageMerger: ImageMerger): Router {
         timing: { totalTimeMs: totalTime }
       });
     }
+  });
+
+  /**
+   * 영상 합성 테스트 (서버 측 FFmpeg 합성)
+   * POST /api/test/video-compose
+   *
+   * 여러 영상 파일을 업로드하고 프레임 레이아웃으로 합성
+   */
+  router.post('/video-compose', upload.array('videos', 8), async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const uploadedFiles: string[] = [];
+
+    try {
+      const files = req.files as Express.Multer.File[];
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'No video files provided' });
+      }
+
+      const { layoutId = '4cut-grid' } = req.body;
+
+      // Get layout configuration
+      const layout = FRAME_LAYOUTS[layoutId];
+      if (!layout) {
+        // Clean up uploaded files
+        for (const file of files) {
+          await fs.unlink(file.path).catch(() => {});
+        }
+        return res.status(400).json({
+          error: 'Invalid layout ID',
+          availableLayouts: Object.keys(FRAME_LAYOUTS),
+        });
+      }
+
+      // Validate video count matches layout
+      if (files.length !== layout.slotCount) {
+        // Clean up uploaded files
+        for (const file of files) {
+          await fs.unlink(file.path).catch(() => {});
+        }
+        return res.status(400).json({
+          error: `Layout ${layoutId} requires ${layout.slotCount} videos, got ${files.length}`,
+        });
+      }
+
+      const testId = uuidv4().slice(0, 8);
+      const uploadTime = Date.now() - startTime;
+
+      // Collect uploaded file paths
+      for (const file of files) {
+        uploadedFiles.push(file.path);
+      }
+
+      const totalInputSize = files.reduce((sum, f) => sum + f.size, 0);
+
+      console.log(`[TestAPI] Video compose started:`, {
+        testId,
+        layoutId,
+        videoCount: files.length,
+        totalInputSizeMB: (totalInputSize / 1024 / 1024).toFixed(2),
+      });
+
+      // Initialize VideoComposer
+      const composer = new VideoComposer(path.join(__dirname, '../../uploads/test'));
+
+      // Compose videos
+      const composeStart = Date.now();
+      const result = await composer.compose(
+        uploadedFiles,
+        {
+          layout,
+          outputFormat: 'mp4',
+          frameRate: 24,
+          quality: 23,
+        },
+        (progress) => {
+          console.log(`[TestAPI] Compose progress: ${progress.percent}% - ${progress.stage}`);
+        }
+      );
+      const composeTime = Date.now() - composeStart;
+
+      // Clean up input files
+      await composer.cleanup(uploadedFiles);
+
+      const totalTime = Date.now() - startTime;
+
+      console.log(`[TestAPI] Video compose complete:`, {
+        testId,
+        layoutId,
+        outputSizeMB: (result.fileSize / 1024 / 1024).toFixed(2),
+        duration: `${result.duration.toFixed(2)}s`,
+        composeTimeMs: composeTime,
+        totalTimeMs: totalTime,
+      });
+
+      res.json({
+        success: true,
+        testId,
+        videoUrl: result.outputUrl,
+        timing: {
+          uploadTimeMs: uploadTime,
+          composeTimeMs: composeTime,
+          totalTimeMs: totalTime,
+          serverTiming: result.timing,
+        },
+        fileInfo: {
+          inputCount: files.length,
+          inputTotalSizeMB: parseFloat((totalInputSize / 1024 / 1024).toFixed(2)),
+          outputSizeMB: parseFloat((result.fileSize / 1024 / 1024).toFixed(2)),
+          duration: parseFloat(result.duration.toFixed(2)),
+        },
+        layout: {
+          id: layoutId,
+          label: layout.label,
+          slotCount: layout.slotCount,
+          canvasSize: `${layout.canvasWidth}x${layout.canvasHeight}`,
+        },
+      });
+
+    } catch (error) {
+      const totalTime = Date.now() - startTime;
+      console.error('[TestAPI] Video compose error:', error);
+
+      // Clean up uploaded files on error
+      for (const filePath of uploadedFiles) {
+        await fs.unlink(filePath).catch(() => {});
+      }
+
+      res.status(500).json({
+        error: 'Failed to compose videos',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timing: { totalTimeMs: totalTime },
+      });
+    }
+  });
+
+  /**
+   * 사용 가능한 레이아웃 목록 조회
+   * GET /api/test/layouts
+   */
+  router.get('/layouts', (req: Request, res: Response) => {
+    const layouts = Object.values(FRAME_LAYOUTS).map(layout => ({
+      id: layout.id,
+      label: layout.label,
+      slotCount: layout.slotCount,
+      canvasSize: `${layout.canvasWidth}x${layout.canvasHeight}`,
+    }));
+
+    res.json({
+      success: true,
+      layouts,
+    });
   });
 
   /**
