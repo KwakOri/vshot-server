@@ -75,6 +75,12 @@ const VIDEO_HEIGHT = 1080;
  * Scale a photo-resolution layout (3000×4500) to video resolution (720×1080)
  * Both share the same 2:3 aspect ratio, so a single scale factor applies.
  */
+/** Round down to nearest even number (required for yuv420p) */
+function toEven(n: number): number {
+  const rounded = Math.round(n);
+  return rounded % 2 === 0 ? rounded : rounded - 1;
+}
+
 function scaleLayout(
   id: string,
   label: string,
@@ -92,8 +98,8 @@ function scaleLayout(
     positions: photoPositions.map((pos) => ({
       x: Math.round(pos.x * scale),
       y: Math.round(pos.y * scale),
-      width: Math.round(pos.width * scale),
-      height: Math.round(pos.height * scale),
+      width: toEven(pos.width * scale),
+      height: toEven(pos.height * scale),
       zIndex: pos.zIndex,
     })),
     canvasWidth: VIDEO_WIDTH,
@@ -294,9 +300,9 @@ export class VideoComposer {
     for (let i = 0; i < inputCount; i++) {
       const pos = positions[i];
 
-      // Scale input to fit position
+      // Scale input to fit position (force_divisible_by=2 prevents yuv420p rounding issues with pad)
       filters.push(
-        `[${i}:v]scale=${pos.width}:${pos.height}:force_original_aspect_ratio=decrease,` +
+        `[${i}:v]scale=${pos.width}:${pos.height}:force_original_aspect_ratio=decrease:force_divisible_by=2,` +
         `pad=${pos.width}:${pos.height}:(ow-iw)/2:(oh-ih)/2:color=${backgroundColor}[v${i}]`
       );
     }
