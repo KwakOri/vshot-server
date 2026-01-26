@@ -196,9 +196,9 @@ export class VideoComposer {
       }
 
       command
-        .complexFilter(filterComplex, 'outv')
+        .complexFilter(filterComplex)
         .outputOptions([
-          '-map', '[outv]',
+          '-map [outv]',
           `-r ${frameRate}`,
           `-crf ${quality}`,
           '-preset fast',
@@ -246,8 +246,14 @@ export class VideoComposer {
             reject(error);
           }
         })
-        .on('error', (err) => {
+        .on('start', (cmd) => {
+          console.log('[VideoComposer] FFmpeg command:', cmd);
+        })
+        .on('error', (err, stdout, stderr) => {
           console.error('[VideoComposer] Composition failed:', err.message);
+          if (stderr) {
+            console.error('[VideoComposer] FFmpeg stderr:', stderr);
+          }
           reject(new Error(`FFmpeg composition failed: ${err.message}`));
         })
         .save(outputPath);
