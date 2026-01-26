@@ -116,15 +116,13 @@ jobs:
             # Restart service (check PM2 first)
             if command -v pm2 &> /dev/null; then
               echo "Restarting with PM2..."
-              if pm2 list | grep -q vshot-server; then
-                pm2 restart vshot-server
+              # Delete stale process if it exists (handles moved directories)
+              pm2 delete vshot-signaling 2>/dev/null || true
+              # Start fresh from ecosystem config or direct
+              if [ -f "ecosystem.config.js" ]; then
+                pm2 start ecosystem.config.js
               else
-                # Use ecosystem.config.js if available, otherwise direct start
-                if [ -f "ecosystem.config.js" ]; then
-                  pm2 start ecosystem.config.js
-                else
-                  pm2 start dist/index.js --name vshot-server
-                fi
+                pm2 start dist/index.js --name vshot-signaling
               fi
               pm2 save
             elif systemctl list-units --full --all | grep -q vshot-signaling.service; then
