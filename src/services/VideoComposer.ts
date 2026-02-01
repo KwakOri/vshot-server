@@ -5,9 +5,21 @@ import ffmpegStatic from 'ffmpeg-static';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Frame layout position for video placement
+ * Frame layout position for video placement (pixel-based)
  */
 export interface FramePosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+}
+
+/**
+ * Frame slot position as ratios (0-1)
+ * Resolution-independent layout definition
+ */
+export interface FrameSlotRatio {
   x: number;
   y: number;
   width: number;
@@ -25,6 +37,18 @@ export interface FrameLayout {
   positions: FramePosition[];
   canvasWidth: number;
   canvasHeight: number;
+  backgroundColor?: string;
+  frameSrc?: string;
+}
+
+/**
+ * Ratio-based layout definition
+ */
+export interface FrameLayoutDefinition {
+  id: string;
+  label: string;
+  slotCount: number;
+  positionRatios: FrameSlotRatio[];
   backgroundColor?: string;
   frameSrc?: string;
 }
@@ -65,71 +89,149 @@ export interface ComposeResult {
 
 /**
  * Video composition resolution (matches client RESOLUTION.VIDEO_WIDTH/HEIGHT)
- * Videos are recorded at this resolution — composition should match.
- * Photo layouts (3000×4500) are for still image capture only.
  */
 const VIDEO_WIDTH = 720;
 const VIDEO_HEIGHT = 1080;
 
 /**
- * Scale a photo-resolution layout (3000×4500) to video resolution (720×1080)
- * Both share the same 2:3 aspect ratio, so a single scale factor applies.
+ * Layout ratio constants (matches client FRAME_LAYOUT_RATIO)
  */
-/** Round down to nearest even number (required for yuv420p) */
+const LAYOUT_RATIO = {
+  gap: 0.0125,    // 1.25% of width
+  padding: 0.025, // 2.5% of width
+};
+
+/**
+ * Round down to nearest even number (required for yuv420p)
+ */
 function toEven(n: number): number {
   const rounded = Math.round(n);
   return rounded % 2 === 0 ? rounded : rounded - 1;
 }
 
-function scaleLayout(
-  id: string,
-  label: string,
-  slotCount: number,
-  photoPositions: FramePosition[],
-  photoCanvasWidth: number,
-  backgroundColor: string = '#1a1a2e',
-  frameSrc?: string,
+/**
+ * Convert ratio-based positions to pixel-based positions
+ */
+function resolvePositions(
+  ratios: FrameSlotRatio[],
+  width: number,
+  height: number
+): FramePosition[] {
+  return ratios.map((ratio) => ({
+    x: Math.round(ratio.x * width),
+    y: Math.round(ratio.y * height),
+    width: toEven(ratio.width * width),
+    height: toEven(ratio.height * height),
+    zIndex: ratio.zIndex,
+  }));
+}
+
+/**
+ * Calculate grid positions as ratios
+ */
+function calculateGridRatios(
+  cols: number,
+  rows: number,
+  padding: number = LAYOUT_RATIO.padding,
+  gap: number = LAYOUT_RATIO.gap
+): FrameSlotRatio[] {
+  const availableWidth = 1 - (padding * 2) - (gap * (cols - 1));
+  const availableHeight = 1 - (padding * 2) - (gap * (rows - 1));
+  const cellWidth = availableWidth / cols;
+  const cellHeight = availableHeight / rows;
+
+  const positions: FrameSlotRatio[] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      positions.push({
+        x: padding + col * (cellWidth + gap),
+        y: padding + row * (cellHeight + gap),
+        width: cellWidth,
+        height: cellHeight,
+        zIndex: row * cols + col,
+      });
+    }
+  }
+
+  return positions;
+}
+
+/**
+ * Single slot that fills the canvas with padding
+ */
+function calculateSingleSlotRatio(
+  padding: number = LAYOUT_RATIO.padding
+): FrameSlotRatio[] {
+  return [{
+    x: padding,
+    y: padding,
+    width: 1 - (padding * 2),
+    height: 1 - (padding * 2),
+    zIndex: 0,
+  }];
+}
+
+/**
+ * Resolve a layout definition to pixel-based FrameLayout
+ */
+function resolveLayout(
+  definition: FrameLayoutDefinition,
+  width: number = VIDEO_WIDTH,
+  height: number = VIDEO_HEIGHT
 ): FrameLayout {
-  const scale = VIDEO_WIDTH / photoCanvasWidth;
   return {
-    id,
-    label,
-    slotCount,
-    positions: photoPositions.map((pos) => ({
-      x: Math.round(pos.x * scale),
-      y: Math.round(pos.y * scale),
-      width: toEven(pos.width * scale),
-      height: toEven(pos.height * scale),
-      zIndex: pos.zIndex,
-    })),
-    canvasWidth: VIDEO_WIDTH,
-    canvasHeight: VIDEO_HEIGHT,
-    backgroundColor,
-    frameSrc,
+    id: definition.id,
+    label: definition.label,
+    slotCount: definition.slotCount,
+    positions: resolvePositions(definition.positionRatios, width, height),
+    canvasWidth: width,
+    canvasHeight: height,
+    backgroundColor: definition.backgroundColor,
+    frameSrc: definition.frameSrc,
   };
 }
 
 /**
- * Predefined frame layouts for video composition (720×1080)
- * Scaled from photo layouts (3000×4500) to match recorded video resolution.
+ * Ratio-based layout definitions
  */
-export const FRAME_LAYOUTS: Record<string, FrameLayout> = {
-  '4cut-grid': scaleLayout('4cut-grid', '인생네컷 (2x2)', 4, [
-    { x: 40, y: 40, width: 1450, height: 2200, zIndex: 0 },
-    { x: 1510, y: 40, width: 1450, height: 2200, zIndex: 1 },
-    { x: 40, y: 2260, width: 1450, height: 2200, zIndex: 2 },
-    { x: 1510, y: 2260, width: 1450, height: 2200, zIndex: 3 },
-  ], 3000),
-  '1cut-polaroid': scaleLayout('1cut-polaroid', '폴라로이드 (단일)', 1, [
-    { x: 40, y: 40, width: 2920, height: 4420, zIndex: 0 },
-  ], 3000),
-  '4cut-quoka': scaleLayout('4cut-quoka', '쿼카 4컷', 4, [
-    { x: 153, y: 1068, width: 1280, height: 1520, zIndex: 0 },
-    { x: 153, y: 2673, width: 1280, height: 1520, zIndex: 1 },
-    { x: 1587, y: 307, width: 1280, height: 1520, zIndex: 2 },
-    { x: 1587, y: 1912, width: 1280, height: 1520, zIndex: 3 },
-  ], 3000),
-};
+const LAYOUT_DEFINITIONS: FrameLayoutDefinition[] = [
+  {
+    id: '4cut-grid',
+    label: '인생네컷 (2x2)',
+    slotCount: 4,
+    positionRatios: calculateGridRatios(2, 2),
+    backgroundColor: '#1a1a2e',
+  },
+  {
+    id: '1cut-polaroid',
+    label: '폴라로이드 (단일)',
+    slotCount: 1,
+    positionRatios: calculateSingleSlotRatio(),
+    backgroundColor: '#1a1a2e',
+  },
+  {
+    id: '4cut-quoka',
+    label: '쿼카 4컷',
+    slotCount: 4,
+    // Quoka frame positions as ratios (original: 3000x4500)
+    positionRatios: [
+      { x: 153 / 3000, y: 1068 / 4500, width: 1280 / 3000, height: 1520 / 4500, zIndex: 0 },
+      { x: 153 / 3000, y: 2673 / 4500, width: 1280 / 3000, height: 1520 / 4500, zIndex: 1 },
+      { x: 1587 / 3000, y: 307 / 4500, width: 1280 / 3000, height: 1520 / 4500, zIndex: 2 },
+      { x: 1587 / 3000, y: 1912 / 4500, width: 1280 / 3000, height: 1520 / 4500, zIndex: 3 },
+    ],
+    backgroundColor: '#1a1a2e',
+    frameSrc: path.join(__dirname, '../../assets/frames/quoka.png'),
+  },
+];
+
+/**
+ * Predefined frame layouts for video composition (720×1080)
+ * Resolved from ratio-based definitions
+ */
+export const FRAME_LAYOUTS: Record<string, FrameLayout> = Object.fromEntries(
+  LAYOUT_DEFINITIONS.map(def => [def.id, resolveLayout(def)])
+);
 
 /**
  * VideoComposer - Server-side video composition using FFmpeg
@@ -156,6 +258,15 @@ export class VideoComposer {
    */
   getLayout(layoutId: string): FrameLayout | undefined {
     return FRAME_LAYOUTS[layoutId];
+  }
+
+  /**
+   * Get layout by ID with custom resolution
+   */
+  getLayoutForResolution(layoutId: string, width: number, height: number): FrameLayout | undefined {
+    const definition = LAYOUT_DEFINITIONS.find(def => def.id === layoutId);
+    if (!definition) return undefined;
+    return resolveLayout(definition, width, height);
   }
 
   /**
@@ -198,14 +309,27 @@ export class VideoComposer {
     const outputFilename = `composed-${uuidv4()}-${Date.now()}.${outputFormat}`;
     const outputPath = path.join(this.outputDir, outputFilename);
 
+    // Check if frame overlay exists
+    let frameOverlayPath: string | undefined;
+    if (layout.frameSrc) {
+      try {
+        await fs.access(layout.frameSrc);
+        frameOverlayPath = layout.frameSrc;
+        console.log('[VideoComposer] Frame overlay found:', frameOverlayPath);
+      } catch {
+        console.warn('[VideoComposer] Frame overlay not found:', layout.frameSrc);
+      }
+    }
+
     console.log('[VideoComposer] Starting composition...');
     console.log('[VideoComposer] Layout:', layout.id, `(${layout.slotCount} slots)`);
     console.log('[VideoComposer] Canvas:', `${layout.canvasWidth}x${layout.canvasHeight}`);
     console.log('[VideoComposer] Inputs:', videoPaths);
+    console.log('[VideoComposer] Frame overlay:', frameOverlayPath || 'none');
     console.log('[VideoComposer] Output:', outputPath);
 
     // Build FFmpeg filter complex
-    const filterComplex = this.buildFilterComplex(layout, videoPaths.length);
+    const filterComplex = this.buildFilterComplex(layout, videoPaths.length, !!frameOverlayPath);
 
     const composeStartTime = Date.now();
     onProgress?.({ percent: 10, currentTime: '00:00:00', stage: 'composing' });
@@ -216,6 +340,11 @@ export class VideoComposer {
       // Add all input videos
       for (const videoPath of videoPaths) {
         command = command.input(videoPath);
+      }
+
+      // Add frame overlay image as last input (if exists)
+      if (frameOverlayPath) {
+        command = command.input(frameOverlayPath);
       }
 
       command
@@ -285,8 +414,11 @@ export class VideoComposer {
 
   /**
    * Build FFmpeg filter complex string for the layout
+   * @param layout Frame layout configuration
+   * @param inputCount Number of video inputs
+   * @param hasFrameOverlay Whether a frame overlay image is included as the last input
    */
-  private buildFilterComplex(layout: FrameLayout, inputCount: number): string {
+  private buildFilterComplex(layout: FrameLayout, inputCount: number, hasFrameOverlay: boolean = false): string {
     const { canvasWidth, canvasHeight, positions, backgroundColor = '#1a1a2e' } = layout;
 
     const filters: string[] = [];
@@ -311,13 +443,28 @@ export class VideoComposer {
     let currentBase = 'base';
     for (let i = 0; i < inputCount; i++) {
       const pos = positions[i];
-      const outputLabel = i === inputCount - 1 ? 'outv' : `tmp${i}`;
+      // If this is the last video and we have a frame overlay, output to 'preframe' instead of 'outv'
+      const isLastVideo = i === inputCount - 1;
+      const outputLabel = isLastVideo ? (hasFrameOverlay ? 'preframe' : 'outv') : `tmp${i}`;
 
       filters.push(
         `[${currentBase}][v${i}]overlay=${pos.x}:${pos.y}:shortest=1[${outputLabel}]`
       );
 
       currentBase = outputLabel;
+    }
+
+    // Add frame overlay on top (if exists)
+    if (hasFrameOverlay) {
+      const frameInputIndex = inputCount; // Frame image is the last input
+
+      // Scale frame image to canvas size and overlay on top
+      filters.push(
+        `[${frameInputIndex}:v]scale=${canvasWidth}:${canvasHeight}[frame]`
+      );
+      filters.push(
+        `[preframe][frame]overlay=0:0:shortest=1[outv]`
+      );
     }
 
     return filters.join(';');

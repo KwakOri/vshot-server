@@ -212,7 +212,7 @@ export function createTestProcessRouter(imageMerger: ImageMerger): Router {
     const startTime = Date.now();
 
     try {
-      const { hostImageData, guestImageData, layout = 'overlap', outputWidth = 3000, outputHeight = 4500 } = req.body;
+      const { hostImageData, guestImageData, layout = 'overlap', outputWidth = 1600, outputHeight = 2400 } = req.body;
 
       if (!hostImageData) {
         return res.status(400).json({ error: 'hostImageData is required' });

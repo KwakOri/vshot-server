@@ -20,7 +20,9 @@ export type SignalMessage =
   | { type: 'host-display-options'; roomId: string; options: DisplayOptions }
   | { type: 'guest-display-options'; roomId: string; options: DisplayOptions }
   | { type: 'aspect-ratio-settings'; roomId: string; settings: AspectRatioSettings }
-  | { type: 'frame-layout-settings'; roomId: string; settings: FrameLayoutSettings };
+  | { type: 'frame-layout-settings'; roomId: string; settings: FrameLayoutSettings }
+  | { type: 'segment-uploaded'; roomId: string; photoNumber: number; filename: string; userId: string }
+  | { type: 'all-segments-uploaded'; roomId: string; segmentCount: number };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;
@@ -53,6 +55,15 @@ export interface FrameLayoutSettings {
   selectablePhotos: number;
 }
 
+export interface UploadedSegment {
+  photoNumber: number;
+  filename: string;
+  filePath: string;
+  fileSize: number;
+  uploadedAt: Date;
+  userId: string;
+}
+
 export interface Room {
   id: string;
   hostId: string;
@@ -67,6 +78,7 @@ export interface Room {
   aspectRatioSettings?: AspectRatioSettings;
   frameLayoutSettings?: FrameLayoutSettings;
   deletionTimerId?: NodeJS.Timeout; // Timer for delayed room deletion
+  uploadedSegments: UploadedSegment[]; // Video segments uploaded for composition
 }
 
 export interface CapturedPhoto {

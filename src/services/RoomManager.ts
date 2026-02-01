@@ -1,4 +1,4 @@
-import { Room, CapturedPhoto } from '../types/signal';
+import { Room, CapturedPhoto, UploadedSegment } from '../types/signal';
 import { v4 as uuidv4 } from 'uuid';
 
 export class RoomManager {
@@ -16,7 +16,8 @@ export class RoomManager {
       selectedPhotos: {
         host: [],
         guest: []
-      }
+      },
+      uploadedSegments: []
     };
 
     this.rooms.set(roomId, room);
@@ -214,5 +215,54 @@ export class RoomManager {
 
   getAllRooms(): Room[] {
     return Array.from(this.rooms.values());
+  }
+
+  // ===== V2: Segment Management Methods =====
+
+  /**
+   * Add an uploaded segment to the room
+   */
+  addUploadedSegment(roomId: string, segment: UploadedSegment): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    // Remove existing segment with same photoNumber (replace)
+    room.uploadedSegments = room.uploadedSegments.filter(
+      s => s.photoNumber !== segment.photoNumber
+    );
+
+    room.uploadedSegments.push(segment);
+    room.uploadedSegments.sort((a, b) => a.photoNumber - b.photoNumber);
+
+    console.log(`[RoomManager] Segment ${segment.photoNumber} added to room ${roomId} (total: ${room.uploadedSegments.length})`);
+  }
+
+  /**
+   * Get all uploaded segments for a room
+   */
+  getUploadedSegments(roomId: string): UploadedSegment[] {
+    const room = this.rooms.get(roomId);
+    return room?.uploadedSegments || [];
+  }
+
+  /**
+   * Get segments by specific photo numbers
+   */
+  getSegmentsByPhotoNumbers(roomId: string, photoNumbers: number[]): UploadedSegment[] {
+    const room = this.rooms.get(roomId);
+    if (!room) return [];
+
+    return room.uploadedSegments.filter(s => photoNumbers.includes(s.photoNumber));
+  }
+
+  /**
+   * Clear all uploaded segments for a room (for new capture session)
+   */
+  clearUploadedSegments(roomId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.uploadedSegments = [];
+    console.log(`[RoomManager] Segments cleared for room ${roomId}`);
   }
 }

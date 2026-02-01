@@ -9,6 +9,7 @@ import { ImageMerger } from './services/ImageMerger';
 import { createPhotoRouter } from './routes/photo';
 import { createVideoRouter } from './routes/video';
 import { createTestProcessRouter } from './routes/test-process';
+import { createVideoV2Router } from './routes/video-v2';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 
 // Load environment variables
@@ -38,6 +39,10 @@ app.use('/api/photo/upload', express.urlencoded({ extended: true, limit: '50mb' 
 // Increase limit for video uploads
 app.use('/api/video/upload', express.json({ limit: '100mb' }));
 app.use('/api/video/upload', express.urlencoded({ extended: true, limit: '100mb' }));
+
+// Increase limit for video-v2 compose (multi-file upload)
+app.use('/api/video-v2', express.json({ limit: '100mb' }));
+app.use('/api/video-v2', express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Increase limit for test API (photo batch can be large)
 app.use('/api/test', express.json({ limit: '100mb' }));
@@ -112,6 +117,9 @@ app.get('/api/ice-servers', apiKeyAuth, (req, res) => {
 // API Routes (protected with API key authentication)
 app.use('/api/photo', apiKeyAuth, createPhotoRouter(imageMerger, roomManager, signalingServer));
 app.use('/api/video', apiKeyAuth, createVideoRouter(signalingServer));
+
+// Video V2 API Routes (server-side FFmpeg composition)
+app.use('/api/video-v2', apiKeyAuth, createVideoV2Router(signalingServer, roomManager));
 
 // Test API Routes (for FirmTestPage - independent of RoomManager)
 app.use('/api/test', apiKeyAuth, createTestProcessRouter(imageMerger));

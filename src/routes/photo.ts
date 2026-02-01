@@ -62,8 +62,8 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
 
               await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, {
                 layout: 'overlap',
-                outputWidth: 3000,  // Match input resolution (2:3 ratio)
-                outputHeight: 4500,
+                outputWidth: 1600,  // Match input resolution (2:3 ratio)
+                outputHeight: 2400,
               });
 
               const mergedUrl = imageMerger.getPublicUrl(mergedFilename);
@@ -135,8 +135,8 @@ export function createPhotoRouter(imageMerger: ImageMerger, roomManager: RoomMan
 
       await imageMerger.mergeImages(guestImagePath, hostImagePath, mergedPath, {
         layout,
-        outputWidth: 3000,  // Match input resolution (2:3 ratio)
-        outputHeight: 4500,
+        outputWidth: 1600,  // Match input resolution (2:3 ratio)
+        outputHeight: 2400,
       });
 
       const publicUrl = imageMerger.getPublicUrl(mergedFilename);
