@@ -265,4 +265,15 @@ export class RoomManager {
     room.uploadedSegments = [];
     console.log(`[RoomManager] Segments cleared for room ${roomId}`);
   }
+
+  /**
+   * Clear all captured photos for a room (for new capture session)
+   */
+  clearCapturedPhotos(roomId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.capturedPhotos = [];
+    console.log(`[RoomManager] Captured photos cleared for room ${roomId}`);
+  }
 }

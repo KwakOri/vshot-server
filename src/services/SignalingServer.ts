@@ -101,6 +101,9 @@ export class SignalingServer {
       case 'frame-layout-settings':
         this.handleFrameLayoutSettings(message);
         break;
+      case 'session-restart':
+        this.handleSessionRestart(message);
+        break;
       default:
         console.warn('[Signaling] Unknown message type:', message);
     }
@@ -431,6 +434,23 @@ export class SignalingServer {
     });
 
     console.log(`[Signaling] Frame layout settings updated in room ${roomId}:`, settings);
+  }
+
+  private handleSessionRestart(message: { type: 'session-restart'; roomId: string; userId: string }): void {
+    const { roomId, userId } = message;
+
+    // Clear room state
+    this.roomManager.clearCapturedPhotos(roomId);
+    this.roomManager.clearUploadedSegments(roomId);
+
+    // Broadcast session restart to all clients in the room
+    this.broadcastToRoom(roomId, {
+      type: 'session-restart',
+      roomId,
+      fromUserId: userId
+    });
+
+    console.log(`[Signaling] Session restarted in room ${roomId} by ${userId}`);
   }
 
   private handleDisconnect(ws: WebSocket): void {
