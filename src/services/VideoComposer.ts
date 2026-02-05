@@ -192,6 +192,14 @@ function resolveLayout(
 }
 
 /**
+ * Get frame asset path - uses process.cwd() for consistent path resolution
+ * Works in both development (tsx) and production (node dist/) modes
+ */
+function getFrameAssetPath(filename: string): string {
+  return path.join(process.cwd(), 'assets', 'frames', filename);
+}
+
+/**
  * Ratio-based layout definitions
  */
 const LAYOUT_DEFINITIONS: FrameLayoutDefinition[] = [
@@ -201,13 +209,18 @@ const LAYOUT_DEFINITIONS: FrameLayoutDefinition[] = [
     slotCount: 4,
     positionRatios: calculateGridRatios(2, 2),
     backgroundColor: '#1a1a2e',
+    frameSrc: getFrameAssetPath('4cut-grid.png'),
   },
   {
     id: '1cut-polaroid',
     label: '폴라로이드 (단일)',
     slotCount: 1,
-    positionRatios: calculateSingleSlotRatio(),
+    // One-cut frame positions as ratios (original: 2000x3000)
+    positionRatios: [
+      { x: 400 / 2000, y: 700 / 3000, width: 1200 / 2000, height: 1800 / 3000, zIndex: 0 },
+    ],
     backgroundColor: '#1a1a2e',
+    frameSrc: getFrameAssetPath('one-cut.png'),
   },
   {
     id: '4cut-quoka',
@@ -221,7 +234,7 @@ const LAYOUT_DEFINITIONS: FrameLayoutDefinition[] = [
       { x: 1587 / 3000, y: 1912 / 4500, width: 1280 / 3000, height: 1520 / 4500, zIndex: 3 },
     ],
     backgroundColor: '#1a1a2e',
-    frameSrc: path.join(__dirname, '../../assets/frames/quoka.png'),
+    frameSrc: getFrameAssetPath('quoka.png'),
   },
 ];
 
@@ -459,11 +472,12 @@ export class VideoComposer {
       const frameInputIndex = inputCount; // Frame image is the last input
 
       // Scale frame image to canvas size and overlay on top
+      // eof_action=repeat: keep showing the last frame of the image (static image stays visible)
       filters.push(
         `[${frameInputIndex}:v]scale=${canvasWidth}:${canvasHeight}[frame]`
       );
       filters.push(
-        `[preframe][frame]overlay=0:0:shortest=1[outv]`
+        `[preframe][frame]overlay=0:0:eof_action=repeat:shortest=0[outv]`
       );
     }
 
