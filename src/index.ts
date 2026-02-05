@@ -20,12 +20,22 @@ const server = http.createServer(app);
 
 // Configuration
 const PORT = process.env.PORT || 3001;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
+const CORS_ORIGINS = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || ['http://localhost:3000'];
 const STORAGE_PATH = process.env.STORAGE_PATH || path.join(__dirname, '../uploads');
 
 // Middleware
 app.use(cors({
-  origin: CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., mobile apps, curl)
+    if (!origin) return callback(null, true);
+
+    if (CORS_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
@@ -145,7 +155,7 @@ server.listen(PORT, () => {
 ║ WebSocket: ws://localhost:${PORT}/signaling
 ╚═══════════════════════════════════════╝
   `);
-  console.log(`[Server] CORS enabled for: ${CORS_ORIGIN}`);
+  console.log(`[Server] CORS enabled for: ${CORS_ORIGINS.join(', ')}`);
   console.log(`[Server] Storage path: ${STORAGE_PATH}`);
 });
 
