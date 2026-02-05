@@ -23,7 +23,8 @@ export type SignalMessage =
   | { type: 'frame-layout-settings'; roomId: string; settings: FrameLayoutSettings }
   | { type: 'segment-uploaded'; roomId: string; photoNumber: number; filename: string; userId: string }
   | { type: 'all-segments-uploaded'; roomId: string; segmentCount: number }
-  | { type: 'session-restart'; roomId: string; userId: string };
+  | { type: 'session-restart'; roomId: string; userId: string }
+  | { type: 'next-guest'; roomId: string; userId: string };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;

@@ -276,4 +276,32 @@ export class RoomManager {
     room.capturedPhotos = [];
     console.log(`[RoomManager] Captured photos cleared for room ${roomId}`);
   }
+
+  /**
+   * Reset session for next guest - keeps host and settings, clears guest and capture data
+   * @returns The old guestId if there was one
+   */
+  resetSessionForNextGuest(roomId: string): { success: boolean; oldGuestId: string | null } {
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      console.log(`[RoomManager] Room not found for reset: ${roomId}`);
+      return { success: false, oldGuestId: null };
+    }
+
+    const oldGuestId = room.guestId;
+
+    // Clear guest
+    if (oldGuestId) {
+      this.userToRoom.delete(oldGuestId);
+    }
+    room.guestId = null;
+
+    // Clear capture data
+    room.capturedPhotos = [];
+    room.uploadedSegments = [];
+    room.selectedPhotos = { host: [], guest: [] };
+
+    console.log(`[RoomManager] Session reset for room ${roomId}, old guest: ${oldGuestId}`);
+    return { success: true, oldGuestId };
+  }
 }

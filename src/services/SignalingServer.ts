@@ -104,6 +104,9 @@ export class SignalingServer {
       case 'session-restart':
         this.handleSessionRestart(message);
         break;
+      case 'next-guest':
+        this.handleNextGuest(message);
+        break;
       default:
         console.warn('[Signaling] Unknown message type:', message);
     }
@@ -451,6 +454,54 @@ export class SignalingServer {
     });
 
     console.log(`[Signaling] Session restarted in room ${roomId} by ${userId}`);
+  }
+
+  private handleNextGuest(message: { type: 'next-guest'; roomId: string; userId: string }): void {
+    const { roomId, userId } = message;
+
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) {
+      console.log(`[Signaling] Room not found for next-guest: ${roomId}`);
+      return;
+    }
+
+    // Only host can trigger next-guest
+    if (room.hostId !== userId) {
+      console.log(`[Signaling] Non-host tried to trigger next-guest: ${userId}`);
+      return;
+    }
+
+    // Get old guest before reset
+    const oldGuestId = room.guestId;
+
+    // Notify current guest to leave (if exists)
+    if (oldGuestId) {
+      const guestClient = this.clients.get(oldGuestId);
+      if (guestClient) {
+        guestClient.ws.send(JSON.stringify({
+          type: 'session-ended',
+          roomId,
+          reason: 'Host started new session'
+        }));
+      }
+      // Remove guest from clients
+      this.clients.delete(oldGuestId);
+    }
+
+    // Reset session (clears guest and capture data)
+    this.roomManager.resetSessionForNextGuest(roomId);
+
+    // Notify host that session is reset and ready for new guest
+    const hostClient = this.clients.get(userId);
+    if (hostClient) {
+      hostClient.ws.send(JSON.stringify({
+        type: 'next-guest-ready',
+        roomId,
+        message: 'Session reset. Ready for new guest.'
+      }));
+    }
+
+    console.log(`[Signaling] Next guest session started in room ${roomId}, old guest: ${oldGuestId}`);
   }
 
   private handleDisconnect(ws: WebSocket): void {
