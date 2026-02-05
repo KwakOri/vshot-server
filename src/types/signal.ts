@@ -24,7 +24,10 @@ export type SignalMessage =
   | { type: 'segment-uploaded'; roomId: string; photoNumber: number; filename: string; userId: string }
   | { type: 'all-segments-uploaded'; roomId: string; segmentCount: number }
   | { type: 'session-restart'; roomId: string; userId: string }
-  | { type: 'next-guest'; roomId: string; userId: string };
+  | { type: 'next-guest'; roomId: string; userId: string }
+  | { type: 'guest-photo-data'; roomId: string; photoNumber: number; imageData: string }
+  | { type: 'photos-merged-client'; roomId: string; mergedPhotos: Array<{ photoNumber: number; imageData: string }> }
+  | { type: 'video-composed-client'; roomId: string; videoUrl: string };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;

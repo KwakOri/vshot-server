@@ -107,6 +107,15 @@ export class SignalingServer {
       case 'next-guest':
         this.handleNextGuest(message);
         break;
+      case 'guest-photo-data':
+        this.handleGuestPhotoData(message);
+        break;
+      case 'photos-merged-client':
+        this.handlePhotosMergedClient(message);
+        break;
+      case 'video-composed-client':
+        this.handleVideoComposedClient(message);
+        break;
       default:
         console.warn('[Signaling] Unknown message type:', message);
     }
@@ -502,6 +511,74 @@ export class SignalingServer {
     }
 
     console.log(`[Signaling] Next guest session started in room ${roomId}, old guest: ${oldGuestId}`);
+  }
+
+  private handleGuestPhotoData(message: { type: 'guest-photo-data'; roomId: string; photoNumber: number; imageData: string }): void {
+    const { roomId, photoNumber, imageData } = message;
+
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) {
+      console.log(`[Signaling] Room not found for guest-photo-data: ${roomId}`);
+      return;
+    }
+
+    // Relay to Host only
+    const hostClient = this.clients.get(room.hostId);
+    if (hostClient && hostClient.ws.readyState === WebSocket.OPEN) {
+      hostClient.ws.send(JSON.stringify({
+        type: 'guest-photo-data',
+        roomId,
+        photoNumber,
+        imageData
+      }));
+      console.log(`[Signaling] Relayed guest-photo-data #${photoNumber} to host in room ${roomId}`);
+    }
+  }
+
+  private handlePhotosMergedClient(message: { type: 'photos-merged-client'; roomId: string; mergedPhotos: Array<{ photoNumber: number; imageData: string }> }): void {
+    const { roomId, mergedPhotos } = message;
+
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) {
+      console.log(`[Signaling] Room not found for photos-merged-client: ${roomId}`);
+      return;
+    }
+
+    // Relay to Guest only
+    if (room.guestId) {
+      const guestClient = this.clients.get(room.guestId);
+      if (guestClient && guestClient.ws.readyState === WebSocket.OPEN) {
+        guestClient.ws.send(JSON.stringify({
+          type: 'photos-merged-client',
+          roomId,
+          mergedPhotos
+        }));
+        console.log(`[Signaling] Relayed photos-merged-client (${mergedPhotos.length} photos) to guest in room ${roomId}`);
+      }
+    }
+  }
+
+  private handleVideoComposedClient(message: { type: 'video-composed-client'; roomId: string; videoUrl: string }): void {
+    const { roomId, videoUrl } = message;
+
+    const room = this.roomManager.getRoom(roomId);
+    if (!room) {
+      console.log(`[Signaling] Room not found for video-composed-client: ${roomId}`);
+      return;
+    }
+
+    // Relay to Guest only
+    if (room.guestId) {
+      const guestClient = this.clients.get(room.guestId);
+      if (guestClient && guestClient.ws.readyState === WebSocket.OPEN) {
+        guestClient.ws.send(JSON.stringify({
+          type: 'video-composed-client',
+          roomId,
+          videoUrl
+        }));
+        console.log(`[Signaling] Relayed video-composed-client to guest in room ${roomId}`);
+      }
+    }
   }
 
   private handleDisconnect(ws: WebSocket): void {
