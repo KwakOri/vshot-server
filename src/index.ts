@@ -20,7 +20,10 @@ const server = http.createServer(app);
 
 // Configuration
 const PORT = process.env.PORT || 3001;
-const CORS_ORIGINS = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || ['http://localhost:3000'];
+const CORS_ORIGINS = [
+  'http://localhost:3000',
+  'https://vshot.site',
+];
 const STORAGE_PATH = process.env.STORAGE_PATH || path.join(__dirname, '../uploads');
 
 // Middleware
