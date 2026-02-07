@@ -1,7 +1,7 @@
 // WebRTC Signaling Message Types
 export type SignalMessage =
   // Connection management
-  | { type: 'join'; roomId: string; userId: string; role: 'host' | 'guest' }
+  | { type: 'join'; roomId: string; userId: string; role: 'host' | 'guest'; mode?: 'v3' | 'festa' }
   | { type: 'joined'; roomId: string; role: 'host' | 'guest'; userId: string; hostId?: string }
   | { type: 'peer-joined'; userId: string; role: 'host' | 'guest' }
   | { type: 'peer-left'; userId: string }
@@ -47,7 +47,9 @@ export type SignalMessage =
   | { type: 'photos-merged-v3'; roomId: string; mergedPhotoUrl: string }
   | { type: 'session-complete-v3'; roomId: string; sessionId: string; frameResultUrl: string }
   // V3 Messages - Host Settings Sync
-  | { type: 'host-settings-sync-v3'; roomId: string; settings: HostSettings };
+  | { type: 'host-settings-sync-v3'; roomId: string; settings: HostSettings }
+  // Festa Messages
+  | { type: 'session-reset-festa'; roomId: string };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;
@@ -149,6 +151,7 @@ export interface V3Room {
   roomId: string;
   hostId: string;
   currentGuestId: string | null;
+  mode: 'v3' | 'festa';
 
   // Host settings (persisted across guests)
   hostSettings: HostSettings;

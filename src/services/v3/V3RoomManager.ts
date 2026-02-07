@@ -15,11 +15,12 @@ export class V3RoomManager {
   /**
    * Create a new room with Host
    */
-  createRoom(roomId: string, hostId: string, initialSettings: HostSettings): V3Room {
+  createRoom(roomId: string, hostId: string, initialSettings: HostSettings, mode: 'v3' | 'festa' = 'v3'): V3Room {
     const room: V3Room = {
       roomId,
       hostId,
       currentGuestId: null,
+      mode,
       hostSettings: initialSettings,
       completedSessions: [],
       createdAt: new Date(),
@@ -204,6 +205,40 @@ export class V3RoomManager {
 
     console.log(`[V3RoomManager] Session completed: ${session.sessionId}`);
     return session;
+  }
+
+  /**
+   * Reset session for Festa mode (keep connection, reset capture state)
+   */
+  resetSessionForFesta(roomId: string): V3Session | null {
+    const room = this.rooms.get(roomId);
+    if (!room || !room.currentGuestId || room.mode !== 'festa') return null;
+
+    // Complete current session
+    const currentSession = this.getCurrentSession(roomId);
+    if (currentSession) {
+      currentSession.status = 'completed';
+      currentSession.completedAt = new Date();
+    }
+
+    // Create new session with same guest
+    const newSession: V3Session = {
+      sessionId: uuidv4(),
+      guestId: room.currentGuestId,
+      hostPhotoUrl: null,
+      guestPhotoUrl: null,
+      mergedPhotoUrl: null,
+      frameResultUrl: null,
+      status: 'in_progress',
+      createdAt: new Date(),
+      completedAt: null,
+    };
+
+    room.completedSessions.push(newSession);
+    room.lastActivityAt = new Date();
+
+    console.log(`[V3RoomManager] Festa session reset for room ${roomId}, new session: ${newSession.sessionId}`);
+    return newSession;
   }
 
   /**

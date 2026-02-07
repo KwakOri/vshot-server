@@ -89,6 +89,11 @@ export class V3SignalingServer {
         this.handleHostSettingsSync(message);
         break;
 
+      // Festa session reset
+      case 'session-reset-festa':
+        this.handleSessionResetFesta(message);
+        break;
+
       // Display settings forwarding (Host <-> Guest)
       case 'chromakey-settings':
       case 'host-display-options':
@@ -109,7 +114,7 @@ export class V3SignalingServer {
     ws: WebSocket,
     message: Extract<SignalMessage, { type: 'join' }>
   ): void {
-    const { roomId, userId, role } = message;
+    const { roomId, userId, role, mode } = message;
 
     // Check if user already connected - handle reconnection
     const existingClient = this.clients.get(userId);
@@ -128,7 +133,7 @@ export class V3SignalingServer {
     this.clients.set(userId, { ws, userId, roomId, role });
 
     if (role === 'host') {
-      this.handleHostJoin(ws, roomId, userId);
+      this.handleHostJoin(ws, roomId, userId, mode);
     } else {
       this.handleGuestJoin(ws, roomId, userId);
     }
@@ -137,7 +142,7 @@ export class V3SignalingServer {
   /**
    * Host joins - create room with default settings
    */
-  private handleHostJoin(ws: WebSocket, roomId: string, hostId: string): void {
+  private handleHostJoin(ws: WebSocket, roomId: string, hostId: string, mode: 'v3' | 'festa' = 'v3'): void {
     // Check if room already exists
     let room = this.roomManager.getRoom(roomId);
 
@@ -157,13 +162,13 @@ export class V3SignalingServer {
           similarity: 0.4,
           smoothness: 0.1,
         },
-        selectedFrameLayoutId: '2x2-grid', // Default frame
+        selectedFrameLayoutId: '1cut-polaroid', // Default frame
         recordingDuration: 10,
         captureInterval: 3,
       };
 
-      room = this.roomManager.createRoom(roomId, hostId, defaultSettings);
-      console.log(`[V3Signaling] Host created room: ${roomId}`);
+      room = this.roomManager.createRoom(roomId, hostId, defaultSettings, mode);
+      console.log(`[V3Signaling] Host created room: ${roomId} (mode: ${mode})`);
     }
 
     // Send confirmation to Host
@@ -392,6 +397,20 @@ export class V3SignalingServer {
         role,
         photoUrl,
       });
+    }
+  }
+
+  /**
+   * Handle Festa session reset (keep connection, reset capture state)
+   */
+  private handleSessionResetFesta(
+    message: Extract<SignalMessage, { type: 'session-reset-festa' }>
+  ): void {
+    const { roomId } = message;
+    const newSession = this.roomManager.resetSessionForFesta(roomId);
+    if (newSession) {
+      this.broadcastToRoom(roomId, { type: 'session-reset-festa', roomId });
+      console.log(`[V3Signaling] Festa session reset for room ${roomId}`);
     }
   }
 
