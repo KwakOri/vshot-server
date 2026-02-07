@@ -15,10 +15,19 @@ export class SignalingServer {
   private clients: Map<string, ClientConnection> = new Map();
   private roomManager: RoomManager;
 
-  constructor(server: HttpServer, roomManager: RoomManager) {
-    this.wss = new WebSocketServer({ server, path: '/signaling' });
+  constructor(roomManager: RoomManager) {
+    this.wss = new WebSocketServer({ noServer: true });
     this.roomManager = roomManager;
     this.initialize();
+  }
+
+  /**
+   * Handle an incoming WebSocket upgrade (called from index.ts)
+   */
+  handleUpgrade(request: import('http').IncomingMessage, socket: import('stream').Duplex, head: Buffer): void {
+    this.wss.handleUpgrade(request, socket, head, (ws) => {
+      this.wss.emit('connection', ws, request);
+    });
   }
 
   private initialize(): void {

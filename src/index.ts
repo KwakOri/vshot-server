@@ -6,11 +6,15 @@ import dotenv from 'dotenv';
 import { SignalingServer } from './services/SignalingServer';
 import { RoomManager } from './services/RoomManager';
 import { ImageMerger } from './services/ImageMerger';
+import { V3RoomManager } from './services/v3/V3RoomManager.js';
+import { V3SignalingServer } from './services/v3/V3SignalingServer.js';
 import { createPhotoRouter } from './routes/photo';
+import { createPhotoV3Router } from './routes/photo-v3.js';
 import { createVideoRouter } from './routes/video';
 import { createTestProcessRouter } from './routes/test-process';
 import { createVideoV2Router } from './routes/video-v2';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
+import WebSocket from 'ws';
 
 // Load environment variables
 dotenv.config();
@@ -74,7 +78,32 @@ app.use('/uploads/test', express.static(path.join(STORAGE_PATH, 'test')));
 // Initialize services
 const roomManager = new RoomManager();
 const imageMerger = new ImageMerger(STORAGE_PATH);
-const signalingServer = new SignalingServer(server, roomManager);
+const signalingServer = new SignalingServer(roomManager);
+
+// V3 Services
+const v3RoomManager = new V3RoomManager();
+const v3SignalingServer = new V3SignalingServer(v3RoomManager);
+
+// V3 WebSocket server on /signaling-v3
+const wssV3 = new WebSocket.Server({ noServer: true });
+wssV3.on('connection', (ws) => {
+  v3SignalingServer.handleConnection(ws);
+});
+
+// Route WebSocket upgrade requests by path
+server.on('upgrade', (request, socket, head) => {
+  const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+
+  if (pathname === '/signaling') {
+    signalingServer.handleUpgrade(request, socket, head);
+  } else if (pathname === '/signaling-v3') {
+    wssV3.handleUpgrade(request, socket, head, (ws) => {
+      wssV3.emit('connection', ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+});
 
 // Ensure upload directory exists
 imageMerger.ensureUploadDir().catch(console.error);
@@ -86,6 +115,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       signaling: '/signaling (WebSocket)',
+      signalingV3: '/signaling-v3 (WebSocket - v3)',
       photo: {
         upload: 'POST /api/photo/upload',
         merge: 'POST /api/photo/merge',
@@ -93,8 +123,11 @@ app.get('/', (req, res) => {
       }
     },
     status: {
-      connectedClients: signalingServer.getConnectedClients(),
-      activeRooms: roomManager.getRoomCount()
+      v2: {
+        connectedClients: signalingServer.getConnectedClients(),
+        activeRooms: roomManager.getRoomCount()
+      },
+      v3: v3SignalingServer.getStats()
     }
   });
 });
@@ -129,6 +162,7 @@ app.get('/api/ice-servers', apiKeyAuth, (req, res) => {
 
 // API Routes (protected with API key authentication)
 app.use('/api/photo', apiKeyAuth, createPhotoRouter(imageMerger, roomManager, signalingServer));
+app.use('/api/photo-v3', apiKeyAuth, createPhotoV3Router(imageMerger, v3RoomManager, v3SignalingServer));
 app.use('/api/video', apiKeyAuth, createVideoRouter(signalingServer));
 
 // Video V2 API Routes (server-side FFmpeg composition)
@@ -151,12 +185,13 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // Start server
 server.listen(PORT, () => {
   console.log(`
-╔═══════════════════════════════════════╗
-║       VShot v2 Server Started         ║
-╠═══════════════════════════════════════╣
-║ HTTP API:  http://localhost:${PORT}    ║
-║ WebSocket: ws://localhost:${PORT}/signaling
-╚═══════════════════════════════════════╝
+╔═══════════════════════════════════════════════╗
+║         VShot v2/v3 Server Started            ║
+╠═══════════════════════════════════════════════╣
+║ HTTP API:    http://localhost:${PORT}         ║
+║ WebSocket v2: ws://localhost:${PORT}/signaling    ║
+║ WebSocket v3: ws://localhost:${PORT}/signaling-v3 ║
+╚═══════════════════════════════════════════════╝
   `);
   console.log(`[Server] CORS enabled for: ${CORS_ORIGINS.join(', ')}`);
   console.log(`[Server] Storage path: ${STORAGE_PATH}`);
