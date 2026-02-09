@@ -193,14 +193,19 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 // Start server
 server.listen(PORT, () => {
+  const serverUrl = process.env.SERVER_URL;
+  const host = serverUrl || `localhost:${PORT}`;
+  const httpProto = serverUrl ? 'https' : 'http';
+  const wsProto = serverUrl ? 'wss' : 'ws';
+
   console.log(`
-╔═══════════════════════════════════════════════╗
-║         VShot v2/v3 Server Started            ║
-╠═══════════════════════════════════════════════╣
-║ HTTP API:    http://localhost:${PORT}         ║
-║ WebSocket v2: ws://localhost:${PORT}/signaling    ║
-║ WebSocket v3: ws://localhost:${PORT}/signaling-v3 ║
-╚═══════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════╗
+║           VShot v2/v3 Server Started              ║
+╠═══════════════════════════════════════════════════╣
+║ HTTP API:     ${httpProto}://${host}
+║ WebSocket v2: ${wsProto}://${host}/signaling
+║ WebSocket v3: ${wsProto}://${host}/signaling-v3
+╚═══════════════════════════════════════════════════╝
   `);
   console.log(`[Server] CORS enabled for: ${CORS_ORIGINS.join(', ')}`);
   console.log(`[Server] Storage path: ${STORAGE_PATH}`);
