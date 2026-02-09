@@ -258,8 +258,8 @@ async function mergePhotos(
     // Use guest image dimensions as the output size (background determines resolution)
     const sharp = (await import('sharp')).default;
     const guestMeta = await sharp(guestPath).metadata();
-    const outputWidth = guestMeta.width || 720;
-    const outputHeight = guestMeta.height || 1080;
+    const outputWidth = guestMeta.width || 1600;
+    const outputHeight = guestMeta.height || 2400;
 
     console.log(`[PhotoV3] Merging at ${outputWidth}x${outputHeight} (from guest image native size)`);
 
