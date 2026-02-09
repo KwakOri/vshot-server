@@ -94,6 +94,12 @@ export class V3SignalingServer {
         this.handleSessionResetFesta(message);
         break;
 
+      // Festa film ready / QR dismissed
+      case 'film-ready-festa':
+      case 'qr-dismissed-festa':
+        this.broadcastToRoom(message.roomId, message);
+        break;
+
       // Display settings forwarding (Host <-> Guest)
       case 'chromakey-settings':
       case 'host-display-options':

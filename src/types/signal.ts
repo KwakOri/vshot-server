@@ -49,7 +49,9 @@ export type SignalMessage =
   // V3 Messages - Host Settings Sync
   | { type: 'host-settings-sync-v3'; roomId: string; settings: HostSettings }
   // Festa Messages
-  | { type: 'session-reset-festa'; roomId: string };
+  | { type: 'session-reset-festa'; roomId: string }
+  | { type: 'film-ready-festa'; roomId: string; filmId: string }
+  | { type: 'qr-dismissed-festa'; roomId: string };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;
