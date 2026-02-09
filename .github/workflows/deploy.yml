@@ -38,7 +38,6 @@ jobs:
           if [ -d "scripts" ]; then
             cp -r scripts deploy/
           fi
-          cp -r node_modules deploy/ || true
           tar -czf deploy.tar.gz -C deploy .
 
       - name: Configure SSH
@@ -77,12 +76,22 @@ jobs:
           # Verify deployment package exists
           ls -lh deploy.tar.gz
 
+          # Calculate local checksum
+          LOCAL_MD5=$(md5sum deploy.tar.gz | awk '{print $1}')
+          echo "Local MD5: $LOCAL_MD5"
+
           # Upload deployment package with verbose output
           echo "Uploading to $DEPLOY_PATH..."
           scp -v deploy.tar.gz deploy-server:$DEPLOY_PATH/
 
-          # Verify upload
-          ssh deploy-server "ls -lh $DEPLOY_PATH/deploy.tar.gz"
+          # Verify upload integrity
+          REMOTE_MD5=$(ssh deploy-server "md5sum $DEPLOY_PATH/deploy.tar.gz | awk '{print \$1}'")
+          echo "Remote MD5: $REMOTE_MD5"
+          if [ "$LOCAL_MD5" != "$REMOTE_MD5" ]; then
+            echo "❌ MD5 mismatch! Local: $LOCAL_MD5, Remote: $REMOTE_MD5"
+            exit 1
+          fi
+          echo "✅ MD5 checksum verified"
 
           # Execute deployment script on server
           ssh deploy-server "DEPLOY_PATH=$DEPLOY_PATH bash -s" << 'ENDSSH'
