@@ -18,7 +18,12 @@ import { authRouter } from './routes/auth';
 import WebSocket from 'ws';
 
 // Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+const envPath = path.resolve(__dirname, '../.env');
+const envResult = dotenv.config({ path: envPath });
+console.log(`[Env] Loading from: ${envPath}`);
+console.log(`[Env] dotenv result: ${envResult.error ? envResult.error.message : 'OK'}`);
+console.log(`[Env] SUPABASE_URL: ${process.env.SUPABASE_URL ? 'SET' : 'MISSING'}`);
+console.log(`[Env] JWT_SECRET: ${process.env.JWT_SECRET ? 'SET' : 'MISSING'}`);
 
 const app = express();
 const server = http.createServer(app);
