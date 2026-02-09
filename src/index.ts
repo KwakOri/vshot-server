@@ -14,6 +14,7 @@ import { createVideoRouter } from './routes/video';
 import { createTestProcessRouter } from './routes/test-process';
 import { createVideoV2Router } from './routes/video-v2';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
+import { authRouter } from './routes/auth';
 import WebSocket from 'ws';
 
 // Load environment variables
@@ -159,6 +160,9 @@ app.get('/api/ice-servers', apiKeyAuth, (req, res) => {
 
   res.json({ iceServers });
 });
+
+// Auth Routes (no API key required)
+app.use('/api/auth', authRouter);
 
 // API Routes (protected with API key authentication)
 app.use('/api/photo', apiKeyAuth, createPhotoRouter(imageMerger, roomManager, signalingServer));
