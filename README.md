@@ -1,4 +1,4 @@
-# VShot v2 Server
+# VShot v2 Server.
 
 WebRTC Signaling Server + High-Resolution Image Merge API
 
@@ -20,21 +20,25 @@ WebRTC Signaling Server + High-Resolution Image Merge API
 ## Setup
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Create `.env` file:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Run in development:
+
 ```bash
 npm run dev
 ```
 
 4. Build for production:
+
 ```bash
 npm run build
 npm start
@@ -124,6 +128,7 @@ git push origin main
 ```
 
 📖 **자세한 가이드:**
+
 - [빠른 시작 (5분)](./QUICKSTART.md)
 - [상세 배포 가이드](./DEPLOYMENT.md)
 
