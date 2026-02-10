@@ -100,6 +100,11 @@ export class V3SignalingServer {
         this.broadcastToRoom(message.roomId, message);
         break;
 
+      // Heartbeat
+      case 'ping':
+        this.send(ws, { type: 'pong' } as any);
+        break;
+
       // Display settings forwarding (Host <-> Guest)
       case 'chromakey-settings':
       case 'host-display-options':
