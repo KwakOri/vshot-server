@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { nanoid } from 'nanoid';
-import { uploadToR2, deleteFromR2, generateObjectKey, getPublicFileUrl } from '../services/r2';
+import { uploadToR2, deleteFromR2, generateObjectKey, getPublicFileUrl, isR2Configured } from '../services/r2';
 import { getSupabase } from '../services/supabase';
 
 const router = Router();
@@ -18,6 +18,12 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
   let objectKey: string | null = null;
 
   try {
+    if (!isR2Configured()) {
+      console.warn('[Festa] R2 not configured, skipping upload');
+      res.status(503).json({ success: false, error: 'Storage (R2) is not configured' });
+      return;
+    }
+
     const file = req.file;
     if (!file) {
       res.status(400).json({ success: false, error: 'No file provided' });

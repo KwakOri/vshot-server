@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import path from 'path';
-import dotenv from 'dotenv';
 import { SignalingServer } from './services/SignalingServer';
 import { RoomManager } from './services/RoomManager';
 import { ImageMerger } from './services/ImageMerger';
@@ -18,11 +18,7 @@ import { authRouter } from './routes/auth';
 import { festaRouter } from './routes/festa';
 import WebSocket from 'ws';
 
-// Load environment variables
-const envPath = path.resolve(__dirname, '../.env');
-const envResult = dotenv.config({ path: envPath });
-console.log(`[Env] Loading from: ${envPath}`);
-console.log(`[Env] dotenv result: ${envResult.error ? envResult.error.message : 'OK'}`);
+// Env loaded via import 'dotenv/config' (first import)
 console.log(`[Env] SUPABASE_URL: ${process.env.SUPABASE_URL ? 'SET' : 'MISSING'}`);
 console.log(`[Env] JWT_SECRET: ${process.env.JWT_SECRET ? 'SET' : 'MISSING'}`);
 

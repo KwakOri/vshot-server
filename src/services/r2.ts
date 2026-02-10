@@ -9,6 +9,10 @@ const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
 let r2Client: S3Client | null = null;
 
+export function isR2Configured(): boolean {
+  return !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME);
+}
+
 function getR2Client(): S3Client {
   if (!r2Client) {
     if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {

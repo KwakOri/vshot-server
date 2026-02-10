@@ -388,34 +388,23 @@ export class V3SignalingServer {
   }
 
   /**
-   * Handle photo uploaded
+   * Handle photo uploaded notification (broadcast only)
+   * Actual photo state is managed by the HTTP upload route (photo-v3.ts)
    */
   private handlePhotoUploaded(
     message: Extract<SignalMessage, { type: 'photo-uploaded-v3' }>
   ): void {
     const { roomId, userId, role, photoUrl } = message;
 
-    // Update session
-    const updated = this.roomManager.updateSessionPhoto(roomId, role, photoUrl);
-
-    if (!updated) {
-      console.error(`[V3Signaling] Failed to update photo for ${role} in room ${roomId}`);
-      return;
-    }
-
-    // Check if both photos uploaded
-    if (this.roomManager.isSessionReadyForMerge(roomId)) {
-      console.log(`[V3Signaling] Both photos uploaded, triggering merge for room ${roomId}`);
-      // Server will handle merge via API route
-      // For now, just broadcast status
-      this.broadcastToRoom(roomId, {
-        type: 'photo-uploaded-v3',
-        roomId,
-        userId,
-        role,
-        photoUrl,
-      });
-    }
+    // Just broadcast the upload notification to the room
+    // Merge is triggered by the HTTP upload route, not here
+    this.broadcastToRoom(roomId, {
+      type: 'photo-uploaded-v3',
+      roomId,
+      userId,
+      role,
+      photoUrl,
+    });
   }
 
   /**
