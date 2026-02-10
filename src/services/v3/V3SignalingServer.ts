@@ -21,6 +21,7 @@ interface Client {
 export class V3SignalingServer {
   private clients: Map<string, Client> = new Map(); // userId -> Client
   private roomManager: V3RoomManager;
+  private qrCountdownTimers: Map<string, ReturnType<typeof setTimeout>> = new Map(); // roomId -> timer
 
   constructor(roomManager: V3RoomManager) {
     this.roomManager = roomManager;
@@ -94,15 +95,21 @@ export class V3SignalingServer {
         this.handleSessionResetFesta(message);
         break;
 
-      // Festa film ready / QR dismissed
+      // Festa film ready → broadcast + start QR countdown
       case 'film-ready-festa':
+        this.broadcastToRoom(message.roomId, message);
+        this.startQRCountdown(message.roomId);
+        break;
+
+      // Festa QR dismissed (manual close by guest)
       case 'qr-dismissed-festa':
+        this.cancelQRCountdown(message.roomId);
         this.broadcastToRoom(message.roomId, message);
         break;
 
       // Heartbeat
       case 'ping':
-        this.send(ws, { type: 'pong' } as any);
+        this.send(ws, { type: 'pong' });
         break;
 
       // Display settings forwarding (Host <-> Guest)
@@ -409,6 +416,44 @@ export class V3SignalingServer {
         photoUrl,
       });
     }
+  }
+
+  /**
+   * QR countdown: 10 seconds after film-ready, auto-close QR on guest
+   */
+  private async startQRCountdown(roomId: string): Promise<void> {
+    // Cancel any existing countdown
+    this.cancelQRCountdown(roomId);
+
+    // Set marker to track active countdown
+    const countdownId = Symbol();
+    this.qrCountdownTimers.set(roomId, countdownId as any);
+
+    for (let count = 10; count > 0; count--) {
+      await this.sleep(1000);
+      // Check if this countdown was cancelled
+      if (this.qrCountdownTimers.get(roomId) !== (countdownId as any)) return;
+      this.broadcastToRoom(roomId, {
+        type: 'qr-countdown-festa',
+        roomId,
+        count,
+      });
+    }
+
+    // Final check before auto-close
+    if (this.qrCountdownTimers.get(roomId) !== (countdownId as any)) return;
+    this.qrCountdownTimers.delete(roomId);
+
+    await this.sleep(1000);
+    this.broadcastToRoom(roomId, {
+      type: 'qr-auto-close-festa',
+      roomId,
+    });
+    console.log(`[V3Signaling] QR auto-closed for room ${roomId}`);
+  }
+
+  private cancelQRCountdown(roomId: string): void {
+    this.qrCountdownTimers.delete(roomId);
   }
 
   /**

@@ -51,7 +51,12 @@ export type SignalMessage =
   // Festa Messages
   | { type: 'session-reset-festa'; roomId: string }
   | { type: 'film-ready-festa'; roomId: string; filmId: string }
-  | { type: 'qr-dismissed-festa'; roomId: string };
+  | { type: 'qr-countdown-festa'; roomId: string; count: number }
+  | { type: 'qr-auto-close-festa'; roomId: string }
+  | { type: 'qr-dismissed-festa'; roomId: string }
+  // Heartbeat
+  | { type: 'ping' }
+  | { type: 'pong' };
 
 export interface DisplayOptions {
   flipHorizontal: boolean;
