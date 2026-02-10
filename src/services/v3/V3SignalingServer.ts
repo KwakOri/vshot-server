@@ -449,6 +449,10 @@ export class V3SignalingServer {
       type: 'qr-auto-close-festa',
       roomId,
     });
+    this.broadcastToRoom(roomId, {
+      type: 'qr-dismissed-festa',
+      roomId,
+    });
     console.log(`[V3Signaling] QR auto-closed for room ${roomId}`);
   }
 
