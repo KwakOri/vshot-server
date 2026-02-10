@@ -15,6 +15,7 @@ import { createTestProcessRouter } from './routes/test-process';
 import { createVideoV2Router } from './routes/video-v2';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { authRouter } from './routes/auth';
+import { festaRouter } from './routes/festa';
 import WebSocket from 'ws';
 
 // Load environment variables
@@ -179,6 +180,9 @@ app.use('/api/video-v2', apiKeyAuth, createVideoV2Router(signalingServer, roomMa
 
 // Test API Routes (for FirmTestPage - independent of RoomManager)
 app.use('/api/test', apiKeyAuth, createTestProcessRouter(imageMerger));
+
+// Festa API Routes (file upload + film creation via Express, bypassing Vercel)
+app.use('/api/festa', apiKeyAuth, festaRouter);
 
 // 404 handler
 app.use((req, res) => {
