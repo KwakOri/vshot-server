@@ -112,9 +112,15 @@ export class V3SignalingServer {
         this.send(ws, { type: 'pong' });
         break;
 
-      // Display settings forwarding (Host <-> Guest)
+      // Display settings: persist to room state + forward
       case 'chromakey-settings':
+        this.handleChromaKeyUpdate(ws, message);
+        break;
       case 'host-display-options':
+        this.handleHostDisplayOptionsUpdate(ws, message);
+        break;
+
+      // Display settings forwarding (no persistence needed)
       case 'guest-display-options':
       case 'frame-layout-settings':
         this.forwardToPeer(ws, message);
@@ -183,6 +189,7 @@ export class V3SignalingServer {
         selectedFrameLayoutId: '1cut-polaroid', // Default frame
         recordingDuration: 10,
         captureInterval: 3,
+        hostFlipHorizontal: false,
       };
 
       room = this.roomManager.createRoom(roomId, hostId, defaultSettings, mode);
@@ -461,6 +468,32 @@ export class V3SignalingServer {
       this.broadcastToRoom(roomId, { type: 'session-reset-festa', roomId });
       console.log(`[V3Signaling] Festa session reset for room ${roomId}`);
     }
+  }
+
+  /**
+   * Handle chromakey settings update - persist to room state + forward to peer
+   */
+  private handleChromaKeyUpdate(ws: WebSocket, message: any): void {
+    const sender = Array.from(this.clients.values()).find(c => c.ws === ws);
+    if (sender && sender.role === 'host' && message.settings) {
+      this.roomManager.updateHostSettings(sender.roomId, {
+        chromaKey: message.settings,
+      });
+    }
+    this.forwardToPeer(ws, message);
+  }
+
+  /**
+   * Handle host display options update - persist flip to room state + forward to peer
+   */
+  private handleHostDisplayOptionsUpdate(ws: WebSocket, message: any): void {
+    const sender = Array.from(this.clients.values()).find(c => c.ws === ws);
+    if (sender && sender.role === 'host' && message.options?.flipHorizontal !== undefined) {
+      this.roomManager.updateHostSettings(sender.roomId, {
+        hostFlipHorizontal: message.options.flipHorizontal,
+      });
+    }
+    this.forwardToPeer(ws, message);
   }
 
   /**

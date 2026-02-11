@@ -140,6 +140,7 @@ export interface HostSettings {
   selectedFrameLayoutId: string;
   recordingDuration: number;
   captureInterval: number;
+  hostFlipHorizontal: boolean;
 }
 
 export interface V3Session {
