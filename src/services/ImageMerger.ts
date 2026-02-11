@@ -1,6 +1,6 @@
 import sharp from 'sharp';
-import fs from 'fs/promises';
-import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { uploadToR2, isR2Configured, getPublicFileUrl, generateObjectKey } from './r2';
 
 export type AspectRatio = '16:9' | '4:3' | '3:4' | '9:16' | '1:1';
 
@@ -20,128 +20,109 @@ export interface MergeOptions {
 }
 
 export class ImageMerger {
-  private uploadDir: string;
+  constructor() {}
 
-  constructor(uploadDir: string) {
-    this.uploadDir = uploadDir;
-  }
-
-  async ensureUploadDir(): Promise<void> {
-    try {
-      await fs.access(this.uploadDir);
-    } catch {
-      await fs.mkdir(this.uploadDir, { recursive: true });
-      console.log(`[ImageMerger] Created upload directory: ${this.uploadDir}`);
+  /**
+   * Save base64 image to R2
+   * @returns R2 public URL
+   */
+  async saveBase64Image(base64Data: string): Promise<{ url: string; fileId: string }> {
+    if (!isR2Configured()) {
+      throw new Error('R2 storage is not configured');
     }
+
+    const base64String = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64String, 'base64');
+    const fileId = uuidv4();
+    const objectKey = generateObjectKey(fileId);
+
+    await uploadToR2(objectKey, buffer, 'image/png');
+
+    const url = getPublicFileUrl(objectKey);
+    console.log(`[ImageMerger] Saved image to R2: ${objectKey}`);
+    return { url, fileId };
   }
 
-  async mergeImages(
-    guestImagePath: string,
-    hostImagePath: string,
-    outputPath: string,
+  /**
+   * Merge two images from buffers
+   * @returns Merged image buffer
+   */
+  async mergeBuffers(
+    guestBuffer: Buffer,
+    hostBuffer: Buffer,
     options: MergeOptions = { layout: 'overlap' }
-  ): Promise<string> {
+  ): Promise<Buffer> {
     const { layout, aspectRatio = '16:9' } = options;
-
-    // Get dimensions from aspect ratio
     const dimensions = ASPECT_RATIOS[aspectRatio];
     const outputWidth = options.outputWidth || dimensions.width;
     const outputHeight = options.outputHeight || dimensions.height;
 
-    try {
-      // Log input image dimensions for debugging
-      const guestMetadata = await sharp(guestImagePath).metadata();
-      const hostMetadata = await sharp(hostImagePath).metadata();
+    const guestMetadata = await sharp(guestBuffer).metadata();
+    const hostMetadata = await sharp(hostBuffer).metadata();
 
-      console.log(`[ImageMerger] Merging images:`, {
-        guest: {
-          path: guestImagePath,
-          size: `${guestMetadata.width}x${guestMetadata.height}`,
-          format: guestMetadata.format,
+    console.log(`[ImageMerger] Merging images:`, {
+      guest: { size: `${guestMetadata.width}x${guestMetadata.height}`, format: guestMetadata.format },
+      host: { size: `${hostMetadata.width}x${hostMetadata.height}`, format: hostMetadata.format },
+      output: { size: `${outputWidth}x${outputHeight}`, layout },
+    });
+
+    if (layout === 'overlap') {
+      const hostResized = await sharp(hostBuffer)
+        .resize(outputWidth, outputHeight, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .toBuffer();
+
+      return sharp(guestBuffer)
+        .resize(outputWidth, outputHeight, { fit: 'cover' })
+        .composite([{ input: hostResized, gravity: 'center' }])
+        .png()
+        .toBuffer();
+    } else if (layout === 'side-by-side') {
+      const halfWidth = Math.floor(outputWidth / 2);
+
+      const guestResized = await sharp(guestBuffer)
+        .resize(halfWidth, outputHeight, { fit: 'cover' })
+        .toBuffer();
+
+      const hostResized = await sharp(hostBuffer)
+        .resize(halfWidth, outputHeight, { fit: 'cover' })
+        .toBuffer();
+
+      return sharp({
+        create: {
+          width: outputWidth,
+          height: outputHeight,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
         },
-        host: {
-          path: hostImagePath,
-          size: `${hostMetadata.width}x${hostMetadata.height}`,
-          format: hostMetadata.format,
-        },
-        output: {
-          size: `${outputWidth}x${outputHeight}`,
-          layout,
-        },
-      });
-
-      if (layout === 'overlap') {
-        // Guest (실사) is background, Host (VTuber with alpha) is foreground
-        await sharp(guestImagePath)
-          .resize(outputWidth, outputHeight, { fit: 'cover' })
-          .composite([
-            {
-              input: await sharp(hostImagePath)
-                .resize(outputWidth, outputHeight, { fit: 'contain' })
-                .toBuffer(),
-              gravity: 'center'
-            }
-          ])
-          .png()
-          .toFile(outputPath);
-
-        console.log(`[ImageMerger] ✅ Merged images (overlap) at ${outputWidth}x${outputHeight}: ${outputPath}`);
-      } else if (layout === 'side-by-side') {
-        // Place images side by side
-        const halfWidth = Math.floor(outputWidth / 2);
-
-        const guestBuffer = await sharp(guestImagePath)
-          .resize(halfWidth, outputHeight, { fit: 'cover' })
-          .toBuffer();
-
-        const hostBuffer = await sharp(hostImagePath)
-          .resize(halfWidth, outputHeight, { fit: 'cover' })
-          .toBuffer();
-
-        await sharp({
-          create: {
-            width: outputWidth,
-            height: outputHeight,
-            channels: 4,
-            background: { r: 255, g: 255, b: 255, alpha: 1 }
-          }
-        })
-          .composite([
-            { input: guestBuffer, left: 0, top: 0 },
-            { input: hostBuffer, left: halfWidth, top: 0 }
-          ])
-          .png()
-          .toFile(outputPath);
-
-        console.log(`[ImageMerger] Merged images (side-by-side) at ${outputWidth}x${outputHeight}: ${outputPath}`);
-      }
-
-      return outputPath;
-    } catch (error) {
-      console.error('[ImageMerger] Error merging images:', error);
-      throw new Error('Failed to merge images');
+      })
+        .composite([
+          { input: guestResized, left: 0, top: 0 },
+          { input: hostResized, left: halfWidth, top: 0 },
+        ])
+        .png()
+        .toBuffer();
     }
+
+    throw new Error(`Unsupported layout: ${layout}`);
   }
 
-  async saveBase64Image(base64Data: string, filename: string): Promise<string> {
-    await this.ensureUploadDir();
+  /**
+   * Merge two images and upload result to R2
+   * @returns R2 public URL of merged image
+   */
+  async mergeAndUpload(
+    guestBuffer: Buffer,
+    hostBuffer: Buffer,
+    options: MergeOptions = { layout: 'overlap' }
+  ): Promise<{ url: string; fileId: string }> {
+    const mergedBuffer = await this.mergeBuffers(guestBuffer, hostBuffer, options);
+    const fileId = uuidv4();
+    const objectKey = generateObjectKey(fileId);
 
-    // Remove data URL prefix if present
-    const base64String = base64Data.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64String, 'base64');
+    await uploadToR2(objectKey, mergedBuffer, 'image/png');
+    const url = getPublicFileUrl(objectKey);
 
-    const filePath = path.join(this.uploadDir, filename);
-    await fs.writeFile(filePath, buffer);
-
-    console.log(`[ImageMerger] Saved image: ${filePath}`);
-    return filePath;
-  }
-
-  getPublicUrl(filename: string): string {
-    return `/uploads/${filename}`;
-  }
-
-  getFilePath(filename: string): string {
-    return path.join(this.uploadDir, filename);
+    console.log(`[ImageMerger] Merged image uploaded to R2: ${objectKey}`);
+    return { url, fileId };
   }
 }
