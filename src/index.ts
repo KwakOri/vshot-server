@@ -2,20 +2,18 @@ import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
-import path from 'path';
 import { SignalingServer } from './services/SignalingServer';
 import { RoomManager } from './services/RoomManager';
 import { ImageMerger } from './services/ImageMerger';
 import { V3RoomManager } from './services/v3/V3RoomManager.js';
 import { V3SignalingServer } from './services/v3/V3SignalingServer.js';
-import { createPhotoRouter } from './routes/photo';
 import { createPhotoV3Router } from './routes/photo-v3.js';
-import { createVideoRouter } from './routes/video';
-import { createTestProcessRouter } from './routes/test-process';
-import { createVideoV2Router } from './routes/video-v2';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { authRouter } from './routes/auth';
 import { festaRouter } from './routes/festa';
+import { framesRouter } from './routes/frames';
+import { frameAccessRouter } from './routes/frame-access';
+import { groupsRouter } from './routes/groups';
 import WebSocket from 'ws';
 
 // Env loaded via import 'dotenv/config' (first import)
@@ -31,7 +29,6 @@ const CORS_ORIGINS = [
   'http://localhost:3000',
   'https://vshot.site',
 ];
-const STORAGE_PATH = process.env.STORAGE_PATH || path.join(__dirname, '../uploads');
 
 // Middleware
 app.use(cors({
@@ -53,34 +50,16 @@ app.use(cors({
 // to avoid the global limit being applied first
 
 // Increase limit for photo uploads (high-resolution images can be large when base64 encoded)
-app.use('/api/photo/upload', express.json({ limit: '50mb' }));
-app.use('/api/photo/upload', express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Increase limit for video uploads
-app.use('/api/video/upload', express.json({ limit: '100mb' }));
-app.use('/api/video/upload', express.urlencoded({ extended: true, limit: '100mb' }));
-
-// Increase limit for video-v2 compose (multi-file upload)
-app.use('/api/video-v2', express.json({ limit: '100mb' }));
-app.use('/api/video-v2', express.urlencoded({ extended: true, limit: '100mb' }));
-
-// Increase limit for test API (photo batch can be large)
-app.use('/api/test', express.json({ limit: '100mb' }));
-app.use('/api/test', express.urlencoded({ extended: true, limit: '100mb' }));
+app.use('/api/photo-v3/upload', express.json({ limit: '50mb' }));
+app.use('/api/photo-v3/upload', express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Global body parser with default 10mb limit (for all other routes)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploaded files
-app.use('/uploads', express.static(STORAGE_PATH));
-
-// Serve test uploads (for FirmTestPage)
-app.use('/uploads/test', express.static(path.join(STORAGE_PATH, 'test')));
-
 // Initialize services
 const roomManager = new RoomManager();
-const imageMerger = new ImageMerger(STORAGE_PATH);
+const imageMerger = new ImageMerger();
 const signalingServer = new SignalingServer(roomManager);
 
 // V3 Services
@@ -108,21 +87,24 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-// Ensure upload directory exists
-imageMerger.ensureUploadDir().catch(console.error);
-
 // Routes
 app.get('/', (req, res) => {
   res.json({
     service: 'VShot v2 Server',
-    version: '1.0.0',
+    version: '2.0.0',
     endpoints: {
       signaling: '/signaling (WebSocket)',
       signalingV3: '/signaling-v3 (WebSocket - v3)',
-      photo: {
-        upload: 'POST /api/photo/upload',
-        merge: 'POST /api/photo/merge',
-        getRoomPhotos: 'GET /api/photo/room/:roomId'
+      photoV3: {
+        upload: 'POST /api/photo-v3/upload',
+        applyFrame: 'POST /api/photo-v3/apply-frame',
+        session: 'GET /api/photo-v3/session/:roomId'
+      },
+      frames: {
+        list: 'GET /api/frames',
+        create: 'POST /api/frames',
+        update: 'PUT /api/frames/:id',
+        delete: 'DELETE /api/frames/:id',
       }
     },
     status: {
@@ -167,18 +149,15 @@ app.get('/api/ice-servers', apiKeyAuth, (req, res) => {
 app.use('/api/auth', authRouter);
 
 // API Routes (protected with API key authentication)
-app.use('/api/photo', apiKeyAuth, createPhotoRouter(imageMerger, roomManager, signalingServer));
 app.use('/api/photo-v3', apiKeyAuth, createPhotoV3Router(imageMerger, v3RoomManager, v3SignalingServer));
-app.use('/api/video', apiKeyAuth, createVideoRouter(signalingServer));
-
-// Video V2 API Routes (server-side FFmpeg composition)
-app.use('/api/video-v2', apiKeyAuth, createVideoV2Router(signalingServer, roomManager));
-
-// Test API Routes (for FirmTestPage - independent of RoomManager)
-app.use('/api/test', apiKeyAuth, createTestProcessRouter(imageMerger));
 
 // Festa API Routes (file upload + film creation via Express, bypassing Vercel)
 app.use('/api/festa', apiKeyAuth, festaRouter);
+
+// Frame Management API Routes (JWT auth, no API key needed)
+app.use('/api/frames', framesRouter);
+app.use('/api/frame-access', frameAccessRouter);
+app.use('/api/groups', groupsRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -208,7 +187,6 @@ server.listen(PORT, () => {
 ╚═══════════════════════════════════════════════════╝
   `);
   console.log(`[Server] CORS enabled for: ${CORS_ORIGINS.join(', ')}`);
-  console.log(`[Server] Storage path: ${STORAGE_PATH}`);
 });
 
 // Graceful shutdown
