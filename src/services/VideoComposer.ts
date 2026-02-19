@@ -212,17 +212,6 @@ const LAYOUT_DEFINITIONS: FrameLayoutDefinition[] = [
     frameSrc: getFrameAssetPath('4cut-grid.png'),
   },
   {
-    id: '1cut-polaroid',
-    label: '폴라로이드 (단일)',
-    slotCount: 1,
-    // One-cut frame positions as ratios (original: 2000x3000)
-    positionRatios: [
-      { x: 400 / 2000, y: 700 / 3000, width: 1200 / 2000, height: 1800 / 3000, zIndex: 0 },
-    ],
-    backgroundColor: '#1a1a2e',
-    frameSrc: getFrameAssetPath('one-cut.png'),
-  },
-  {
     id: '4cut-quoka',
     label: '쿼카 4컷',
     slotCount: 4,

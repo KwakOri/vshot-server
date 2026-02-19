@@ -186,7 +186,7 @@ export class V3SignalingServer {
           similarity: 0.4,
           smoothness: 0.1,
         },
-        selectedFrameLayoutId: '1cut-polaroid', // Default frame
+        selectedFrameLayoutId: '', // Default: no frame selected
         recordingDuration: 10,
         captureInterval: 3,
         hostFlipHorizontal: false,
