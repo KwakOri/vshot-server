@@ -415,7 +415,7 @@ export class V3SignalingServer {
   }
 
   /**
-   * QR countdown: 10 seconds after film-ready, auto-close QR on guest
+   * QR countdown: 40 seconds after film-ready, auto-close QR on guest
    */
   private async startQRCountdown(roomId: string): Promise<void> {
     // Cancel any existing countdown
@@ -425,7 +425,7 @@ export class V3SignalingServer {
     const countdownId = Symbol();
     this.qrCountdownTimers.set(roomId, countdownId as any);
 
-    for (let count = 10; count > 0; count--) {
+    for (let count = 40; count > 0; count--) {
       await this.sleep(1000);
       // Check if this countdown was cancelled
       if (this.qrCountdownTimers.get(roomId) !== (countdownId as any)) return;
