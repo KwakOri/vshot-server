@@ -44,7 +44,7 @@ export type SignalMessage =
   | { type: 'countdown-tick-v3'; roomId: string; count: number }
   | { type: 'capture-now-v3'; roomId: string }
   | { type: 'photo-uploaded-v3'; roomId: string; userId: string; role: 'host' | 'guest'; photoUrl: string }
-  | { type: 'photos-merged-v3'; roomId: string; mergedPhotoUrl: string }
+  | { type: 'photos-merged-v3'; roomId: string; mergedPhotoUrl: string; mergeStatus: 'provisional' | 'final' }
   | { type: 'session-complete-v3'; roomId: string; sessionId: string; frameResultUrl: string }
   // V3 Messages - Host Settings Sync
   | { type: 'host-settings-sync-v3'; roomId: string; settings: HostSettings }
@@ -146,8 +146,14 @@ export interface HostSettings {
 export interface V3Session {
   sessionId: string;
   guestId: string;
+  // Insurance tier (small JPEG, fast upload)
+  hostInsuranceUrl: string | null;
+  guestInsuranceUrl: string | null;
+  // Final tier (full-res PNG)
   hostPhotoUrl: string | null;
   guestPhotoUrl: string | null;
+  // Merge state
+  mergeStatus: 'none' | 'provisional' | 'final';
   mergedPhotoUrl: string | null;
   frameResultUrl: string | null;
   status: 'in_progress' | 'completed';

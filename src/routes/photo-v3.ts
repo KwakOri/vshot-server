@@ -21,15 +21,17 @@ export function createPhotoV3Router(
   // Track merge in progress to prevent race condition
   const mergeInProgress = new Set<string>();
 
-  // In-memory buffer store for merge (cleared after merge)
+  // In-memory buffer store for merge: keyed by `${roomId}:${tier}` (tier = 'insurance' | 'final')
   const photoBuffers = new Map<string, { host?: Buffer; guest?: Buffer }>();
 
   /**
    * Upload photo (base64) - V3 version
+   * uploadType: 'insurance' (small JPEG, fast) | 'final' (full-res PNG, default)
+   * Insurance uploads trigger a provisional merge; final uploads trigger the definitive merge.
    */
   router.post('/upload', async (req: Request, res: Response) => {
     try {
-      const { roomId, userId, role, imageData } = req.body;
+      const { roomId, userId, role, imageData, uploadType = 'final' } = req.body;
 
       if (!roomId || !userId || !role || !imageData) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -37,6 +39,10 @@ export function createPhotoV3Router(
 
       if (role !== 'host' && role !== 'guest') {
         return res.status(400).json({ error: 'Invalid role' });
+      }
+
+      if (uploadType !== 'insurance' && uploadType !== 'final') {
+        return res.status(400).json({ error: 'uploadType must be insurance or final' });
       }
 
       // Get room
@@ -56,68 +62,110 @@ export function createPhotoV3Router(
       // Save image to R2
       const { url: publicUrl, fileId } = await imageMerger.saveBase64Image(imageData);
 
-      // Store buffer for merge
+      // Store buffer for merge (keyed by tier)
       const base64String = imageData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64String, 'base64');
-      if (!photoBuffers.has(roomId)) {
-        photoBuffers.set(roomId, {});
+      const bufferKey = `${roomId}:${uploadType}`;
+      if (!photoBuffers.has(bufferKey)) {
+        photoBuffers.set(bufferKey, {});
       }
-      const buffers = photoBuffers.get(roomId)!;
+      const buffers = photoBuffers.get(bufferKey)!;
       buffers[role as 'host' | 'guest'] = buffer;
 
-      // Log upload
-      const estimatedSize = (buffer.length) / 1024 / 1024;
-      console.log(`[PhotoV3] ${role} uploaded for room ${roomId}:`, {
+      const estimatedSize = buffer.length / 1024 / 1024;
+      console.log(`[PhotoV3] ${role} ${uploadType} uploaded for room ${roomId}:`, {
         fileId,
         estimatedSizeMB: estimatedSize.toFixed(2),
       });
 
-      // Update session
-      v3RoomManager.updateSessionPhoto(roomId, role, publicUrl);
+      if (uploadType === 'insurance') {
+        // Update insurance URL in session
+        v3RoomManager.updateSessionInsurance(roomId, role, publicUrl);
 
-      // Check if ready for merge (with race condition protection)
-      if (v3RoomManager.isSessionReadyForMerge(roomId) && !mergeInProgress.has(roomId)) {
-        mergeInProgress.add(roomId);
-        console.log(`[PhotoV3] Both photos ready, starting merge for room ${roomId}`);
+        // Provisional merge when both insurance images ready
+        const provisionalKey = `${roomId}:provisional`;
+        if (v3RoomManager.isSessionReadyForProvisionalMerge(roomId) && !mergeInProgress.has(provisionalKey)) {
+          mergeInProgress.add(provisionalKey);
+          console.log(`[PhotoV3] Both insurance images ready, starting provisional merge for room ${roomId}`);
 
-        // Trigger merge asynchronously
-        setImmediate(async () => {
-          try {
-            const mergedUrl = await mergePhotos(roomId, imageMerger, v3RoomManager, photoBuffers);
+          setImmediate(async () => {
+            try {
+              const mergedUrl = await mergePhotosFromBuffers(roomId, 'insurance', imageMerger, v3RoomManager, photoBuffers);
 
-            if (mergedUrl) {
-              // Broadcast merge complete to room via signaling
-              v3SignalingServer.broadcastToRoom(roomId, {
-                type: 'photos-merged-v3',
-                roomId,
-                mergedPhotoUrl: mergedUrl,
-              });
+              if (mergedUrl) {
+                // Mark session as provisional
+                const session = v3RoomManager.getCurrentSession(roomId);
+                if (session) {
+                  session.mergeStatus = 'provisional';
+                  session.mergedPhotoUrl = mergedUrl;
+                }
 
-              // Auto-complete session with merged photo as result
-              const session = v3RoomManager.completeSession(roomId, mergedUrl);
-
-              if (session) {
                 v3SignalingServer.broadcastToRoom(roomId, {
-                  type: 'session-complete-v3',
+                  type: 'photos-merged-v3',
                   roomId,
-                  sessionId: session.sessionId,
-                  frameResultUrl: mergedUrl,
+                  mergedPhotoUrl: mergedUrl,
+                  mergeStatus: 'provisional',
                 });
+
+                console.log(`[PhotoV3] Provisional merge complete for room ${roomId}`);
               }
+            } catch (error) {
+              console.error(`[PhotoV3] Provisional merge failed for room ${roomId}:`, error);
+            } finally {
+              mergeInProgress.delete(provisionalKey);
+              photoBuffers.delete(bufferKey);
             }
-          } catch (error) {
-            console.error(`[PhotoV3] Merge failed for room ${roomId}:`, error);
-          } finally {
-            mergeInProgress.delete(roomId);
-            photoBuffers.delete(roomId); // Cleanup buffers
-          }
-        });
+          });
+        }
+      } else {
+        // Final upload
+        v3RoomManager.updateSessionPhoto(roomId, role, publicUrl);
+
+        // Final merge when both final images ready
+        const finalKey = `${roomId}:final`;
+        if (v3RoomManager.isSessionReadyForMerge(roomId) && !mergeInProgress.has(finalKey)) {
+          mergeInProgress.add(finalKey);
+          console.log(`[PhotoV3] Both final photos ready, starting final merge for room ${roomId}`);
+
+          setImmediate(async () => {
+            try {
+              const mergedUrl = await mergePhotosFromBuffers(roomId, 'final', imageMerger, v3RoomManager, photoBuffers);
+
+              if (mergedUrl) {
+                v3SignalingServer.broadcastToRoom(roomId, {
+                  type: 'photos-merged-v3',
+                  roomId,
+                  mergedPhotoUrl: mergedUrl,
+                  mergeStatus: 'final',
+                });
+
+                // Complete session
+                const session = v3RoomManager.completeSession(roomId, mergedUrl);
+
+                if (session) {
+                  v3SignalingServer.broadcastToRoom(roomId, {
+                    type: 'session-complete-v3',
+                    roomId,
+                    sessionId: session.sessionId,
+                    frameResultUrl: mergedUrl,
+                  });
+                }
+              }
+            } catch (error) {
+              console.error(`[PhotoV3] Final merge failed for room ${roomId}:`, error);
+            } finally {
+              mergeInProgress.delete(finalKey);
+              photoBuffers.delete(`${roomId}:final`);
+            }
+          });
+        }
       }
 
       res.json({
         success: true,
         url: publicUrl,
         fileId,
+        uploadType,
       });
     } catch (error) {
       console.error('[PhotoV3] Upload error:', error);
@@ -219,29 +267,21 @@ export function createPhotoV3Router(
 }
 
 /**
- * Merge host and guest photos using in-memory buffers
+ * Merge host and guest photos from in-memory buffers
+ * @param tier - 'insurance' (provisional) or 'final' (definitive)
  */
-async function mergePhotos(
+async function mergePhotosFromBuffers(
   roomId: string,
+  tier: 'insurance' | 'final',
   imageMerger: ImageMerger,
   v3RoomManager: V3RoomManager,
   photoBuffers: Map<string, { host?: Buffer; guest?: Buffer }>
 ): Promise<string | null> {
   try {
-    const session = v3RoomManager.getCurrentSession(roomId);
-    if (!session || !session.hostPhotoUrl || !session.guestPhotoUrl) {
-      console.error(`[PhotoV3] Cannot merge - photos not ready for room ${roomId}`);
-      return null;
-    }
-
-    if (session.mergedPhotoUrl) {
-      console.log(`[PhotoV3] Session already merged for room ${roomId}`);
-      return session.mergedPhotoUrl;
-    }
-
-    const buffers = photoBuffers.get(roomId);
+    const bufferKey = `${roomId}:${tier}`;
+    const buffers = photoBuffers.get(bufferKey);
     if (!buffers?.host || !buffers?.guest) {
-      console.error(`[PhotoV3] Cannot merge - buffers not available for room ${roomId}`);
+      console.error(`[PhotoV3] Cannot merge - ${tier} buffers not available for room ${roomId}`);
       return null;
     }
 
@@ -251,7 +291,7 @@ async function mergePhotos(
     const outputWidth = guestMeta.width || 1600;
     const outputHeight = guestMeta.height || 2400;
 
-    console.log(`[PhotoV3] Merging at ${outputWidth}x${outputHeight} (from guest image native size)`);
+    console.log(`[PhotoV3] ${tier} merge at ${outputWidth}x${outputHeight} for room ${roomId}`);
 
     const { url: mergedUrl } = await imageMerger.mergeAndUpload(buffers.guest, buffers.host, {
       layout: 'overlap',
@@ -259,13 +299,13 @@ async function mergePhotos(
       outputHeight,
     });
 
-    // Update session
+    // Update session merged URL
     v3RoomManager.updateSessionMergedPhoto(roomId, mergedUrl);
 
-    console.log(`[PhotoV3] Photos merged successfully for room ${roomId}`);
+    console.log(`[PhotoV3] ${tier} merge complete for room ${roomId}`);
     return mergedUrl;
   } catch (error) {
-    console.error(`[PhotoV3] Merge error for room ${roomId}:`, error);
+    console.error(`[PhotoV3] ${tier} merge error for room ${roomId}:`, error);
     throw error;
   }
 }

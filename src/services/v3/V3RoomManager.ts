@@ -76,8 +76,11 @@ export class V3RoomManager {
     const session: V3Session = {
       sessionId: uuidv4(),
       guestId,
+      hostInsuranceUrl: null,
+      guestInsuranceUrl: null,
       hostPhotoUrl: null,
       guestPhotoUrl: null,
+      mergeStatus: 'none',
       mergedPhotoUrl: null,
       frameResultUrl: null,
       status: 'in_progress',
@@ -134,6 +137,39 @@ export class V3RoomManager {
   }
 
   /**
+   * Update session insurance (small JPEG) URL
+   */
+  updateSessionInsurance(
+    roomId: string,
+    role: 'host' | 'guest',
+    insuranceUrl: string
+  ): boolean {
+    const session = this.getCurrentSession(roomId);
+    if (!session) return false;
+
+    if (role === 'host') {
+      session.hostInsuranceUrl = insuranceUrl;
+    } else {
+      session.guestInsuranceUrl = insuranceUrl;
+    }
+
+    const room = this.rooms.get(roomId);
+    if (room) room.lastActivityAt = new Date();
+
+    console.log(`[V3RoomManager] ${role} insurance uploaded for session: ${session.sessionId}`);
+    return true;
+  }
+
+  /**
+   * Check if both insurance images are ready (provisional merge can start)
+   */
+  isSessionReadyForProvisionalMerge(roomId: string): boolean {
+    const session = this.getCurrentSession(roomId);
+    if (!session) return false;
+    return !!(session.hostInsuranceUrl && session.guestInsuranceUrl) && session.mergeStatus === 'none';
+  }
+
+  /**
    * Update session photo URLs
    */
   updateSessionPhoto(
@@ -160,13 +196,13 @@ export class V3RoomManager {
   }
 
   /**
-   * Check if both photos are uploaded (ready for merge)
+   * Check if both final photos are uploaded (ready for final merge)
    */
   isSessionReadyForMerge(roomId: string): boolean {
     const session = this.getCurrentSession(roomId);
     if (!session) return false;
 
-    return !!(session.hostPhotoUrl && session.guestPhotoUrl);
+    return !!(session.hostPhotoUrl && session.guestPhotoUrl) && session.mergeStatus !== 'final';
   }
 
   /**
@@ -225,8 +261,11 @@ export class V3RoomManager {
     const newSession: V3Session = {
       sessionId: uuidv4(),
       guestId: room.currentGuestId,
+      hostInsuranceUrl: null,
+      guestInsuranceUrl: null,
       hostPhotoUrl: null,
       guestPhotoUrl: null,
+      mergeStatus: 'none',
       mergedPhotoUrl: null,
       frameResultUrl: null,
       status: 'in_progress',
