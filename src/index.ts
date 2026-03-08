@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import * as os from 'node:os';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { SignalingServer } from './services/SignalingServer';
 import { RoomManager } from './services/RoomManager';
 import { ImageMerger } from './services/ImageMerger';
@@ -65,6 +67,111 @@ const signalingServer = new SignalingServer(roomManager);
 // V3 Services
 const v3RoomManager = new V3RoomManager();
 const v3SignalingServer = new V3SignalingServer(v3RoomManager);
+const eventLoopDelayMonitor = monitorEventLoopDelay({ resolution: 20 });
+eventLoopDelayMonitor.enable();
+
+function bytesToMb(bytes: number): number {
+  return Number((bytes / 1024 / 1024).toFixed(2));
+}
+
+function nanosecondsToMs(nanoseconds: number): number | null {
+  if (!Number.isFinite(nanoseconds)) {
+    return null;
+  }
+
+  return Number((nanoseconds / 1_000_000).toFixed(2));
+}
+
+function getV2StatusSnapshot() {
+  const rooms = roomManager.getAllRooms();
+
+  return {
+    connectedClients: signalingServer.getConnectedClients(),
+    activeRooms: rooms.length,
+    occupiedRooms: rooms.filter(room => !!room.guestId).length,
+    waitingRooms: rooms.filter(room => !room.guestId).length,
+    roomsPendingDeletion: rooms.filter(room => !!room.deletionTimerId).length,
+    capturedPhotos: rooms.reduce((total, room) => total + room.capturedPhotos.length, 0),
+    uploadedSegments: rooms.reduce((total, room) => total + room.uploadedSegments.length, 0),
+  };
+}
+
+function getV3StatusSnapshot() {
+  const rooms = v3RoomManager.getAllRooms();
+  const roomsByMode = { v3: 0, festa: 0, photo: 0 };
+
+  rooms.forEach(room => {
+    roomsByMode[room.mode]++;
+  });
+
+  const sessions = rooms.flatMap(room => room.completedSessions);
+
+  return {
+    connectedClients: v3SignalingServer.getStats().connectedClients,
+    activeRooms: rooms.length,
+    occupiedRooms: rooms.filter(room => !!room.currentGuestId).length,
+    waitingRooms: rooms.filter(room => !room.currentGuestId).length,
+    roomsByMode,
+    sessions: {
+      total: sessions.length,
+      inProgress: sessions.filter(session => session.status === 'in_progress').length,
+      completed: sessions.filter(session => session.status === 'completed').length,
+      mergeStatus: {
+        none: sessions.filter(session => session.mergeStatus === 'none').length,
+        provisional: sessions.filter(session => session.mergeStatus === 'provisional').length,
+        final: sessions.filter(session => session.mergeStatus === 'final').length,
+      },
+    },
+  };
+}
+
+function getInternalStatusSnapshot() {
+  const memoryUsage = process.memoryUsage();
+  const cpuUsage = process.cpuUsage();
+  const [load1m, load5m, load15m] = os.loadavg();
+
+  return {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    process: {
+      pid: process.pid,
+      nodeVersion: process.version,
+      uptimeSec: Number(process.uptime().toFixed(2)),
+      memoryMb: {
+        rss: bytesToMb(memoryUsage.rss),
+        heapTotal: bytesToMb(memoryUsage.heapTotal),
+        heapUsed: bytesToMb(memoryUsage.heapUsed),
+        external: bytesToMb(memoryUsage.external),
+        arrayBuffers: bytesToMb(memoryUsage.arrayBuffers),
+      },
+      cpuUsageMicros: {
+        user: cpuUsage.user,
+        system: cpuUsage.system,
+      },
+      loadAverage: {
+        '1m': Number(load1m.toFixed(2)),
+        '5m': Number(load5m.toFixed(2)),
+        '15m': Number(load15m.toFixed(2)),
+      },
+      eventLoopDelayMs: {
+        min: nanosecondsToMs(eventLoopDelayMonitor.min),
+        mean: nanosecondsToMs(eventLoopDelayMonitor.mean),
+        max: nanosecondsToMs(eventLoopDelayMonitor.max),
+        p95: nanosecondsToMs(eventLoopDelayMonitor.percentile(95)),
+      },
+    },
+    configuration: {
+      turnConfigured: !!(process.env.TURN_SERVER_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL),
+      supabaseConfigured: !!process.env.SUPABASE_URL,
+      jwtConfigured: !!process.env.JWT_SECRET,
+      apiKeyConfigured: !!process.env.API_KEY,
+    },
+    rooms: {
+      v2: getV2StatusSnapshot(),
+      v3: getV3StatusSnapshot(),
+    },
+  };
+}
 
 // V3 WebSocket server on /signaling-v3
 const wssV3 = new WebSocket.Server({ noServer: true });
@@ -100,6 +207,9 @@ app.get('/', (req, res) => {
         applyFrame: 'POST /api/photo-v3/apply-frame',
         session: 'GET /api/photo-v3/session/:roomId'
       },
+      internal: {
+        status: 'GET /api/internal/status (API key required)',
+      },
       frames: {
         list: 'GET /api/frames',
         create: 'POST /api/frames',
@@ -123,6 +233,11 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
+});
+
+app.get('/api/internal/status', apiKeyAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(getInternalStatusSnapshot());
 });
 
 // ICE Servers configuration endpoint (requires authentication)
