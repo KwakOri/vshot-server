@@ -22,6 +22,8 @@ export class V3SignalingServer {
   private clients: Map<string, Client> = new Map(); // userId -> Client
   private roomManager: V3RoomManager;
   private qrCountdownTimers: Map<string, ReturnType<typeof setTimeout>> = new Map(); // roomId -> timer
+  private readonly photoRedirectCountdownSeconds = 30;
+  private readonly festaQrCountdownSeconds = 40;
 
   constructor(roomManager: V3RoomManager) {
     this.roomManager = roomManager;
@@ -95,7 +97,7 @@ export class V3SignalingServer {
         this.handleSessionResetFesta(message);
         break;
 
-      // Festa film ready → broadcast + start QR countdown
+      // Festa/Photo film ready -> broadcast + start countdown
       case 'film-ready-festa':
         this.broadcastToRoom(message.roomId, message);
         this.startQRCountdown(message.roomId);
@@ -166,7 +168,7 @@ export class V3SignalingServer {
   /**
    * Host joins - create room with default settings
    */
-  private handleHostJoin(ws: WebSocket, roomId: string, hostId: string, mode: 'v3' | 'festa' = 'v3'): void {
+  private handleHostJoin(ws: WebSocket, roomId: string, hostId: string, mode: 'v3' | 'festa' | 'photo' = 'v3'): void {
     // Check if room already exists
     let room = this.roomManager.getRoom(roomId);
 
@@ -278,6 +280,7 @@ export class V3SignalingServer {
     if (!client) return;
 
     if (client.role === 'host') {
+      this.cancelQRCountdown(roomId);
       // Host leaves - destroy room
       this.roomManager.destroyRoom(roomId);
       console.log(`[V3Signaling] Host left, room destroyed: ${roomId}`);
@@ -291,6 +294,7 @@ export class V3SignalingServer {
         });
       }
     } else {
+      this.cancelQRCountdown(roomId);
       // Guest leaves - end session, preserve room
       this.roomManager.leaveGuest(roomId, userId);
 
@@ -425,7 +429,9 @@ export class V3SignalingServer {
     const countdownId = Symbol();
     this.qrCountdownTimers.set(roomId, countdownId as any);
 
-    for (let count = 40; count > 0; count--) {
+    const countdownSeconds = this.getCountdownSeconds(roomId);
+
+    for (let count = countdownSeconds; count > 0; count--) {
       await this.sleep(1000);
       // Check if this countdown was cancelled
       if (this.qrCountdownTimers.get(roomId) !== (countdownId as any)) return;
@@ -449,11 +455,19 @@ export class V3SignalingServer {
       type: 'qr-dismissed-festa',
       roomId,
     });
-    console.log(`[V3Signaling] QR auto-closed for room ${roomId}`);
+    console.log(`[V3Signaling] Result countdown completed for room ${roomId}`);
   }
 
   private cancelQRCountdown(roomId: string): void {
     this.qrCountdownTimers.delete(roomId);
+  }
+
+  private getCountdownSeconds(roomId: string): number {
+    const room = this.roomManager.getRoom(roomId);
+    if (room?.mode === 'photo') {
+      return this.photoRedirectCountdownSeconds;
+    }
+    return this.festaQrCountdownSeconds;
   }
 
   /**

@@ -15,7 +15,7 @@ export class V3RoomManager {
   /**
    * Create a new room with Host
    */
-  createRoom(roomId: string, hostId: string, initialSettings: HostSettings, mode: 'v3' | 'festa' = 'v3'): V3Room {
+  createRoom(roomId: string, hostId: string, initialSettings: HostSettings, mode: 'v3' | 'festa' | 'photo' = 'v3'): V3Room {
     const room: V3Room = {
       roomId,
       hostId,

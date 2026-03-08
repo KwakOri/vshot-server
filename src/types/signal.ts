@@ -1,7 +1,7 @@
 // WebRTC Signaling Message Types
 export type SignalMessage =
   // Connection management
-  | { type: 'join'; roomId: string; userId: string; role: 'host' | 'guest'; mode?: 'v3' | 'festa' }
+  | { type: 'join'; roomId: string; userId: string; role: 'host' | 'guest'; mode?: 'v3' | 'festa' | 'photo' }
   | { type: 'joined'; roomId: string; role: 'host' | 'guest'; userId: string; hostId?: string }
   | { type: 'peer-joined'; userId: string; role: 'host' | 'guest' }
   | { type: 'peer-left'; userId: string }
@@ -165,7 +165,7 @@ export interface V3Room {
   roomId: string;
   hostId: string;
   currentGuestId: string | null;
-  mode: 'v3' | 'festa';
+  mode: 'v3' | 'festa' | 'photo';
 
   // Host settings (persisted across guests)
   hostSettings: HostSettings;
