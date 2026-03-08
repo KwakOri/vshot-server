@@ -50,6 +50,7 @@ npm start
 
 - `GET /` - Server info
 - `GET /health` - Health check
+- `GET /api/internal/status` - Internal status snapshot (`X-Internal-Status-Key` required)
 - `POST /api/photo/upload` - Upload photo (base64)
 - `POST /api/photo/merge` - Merge host + guest photos
 - `GET /api/photo/room/:roomId` - Get room photos

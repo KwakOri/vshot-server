@@ -88,3 +88,46 @@ export function optionalApiKeyAuth(req: Request, res: Response, next: NextFuncti
   // Authentication successful
   next();
 }
+
+/**
+ * Internal Status API Key Authentication Middleware
+ *
+ * Validates a dedicated key for operational status polling.
+ *
+ * Expected header format:
+ *   X-Internal-Status-Key: your-monitoring-key-here
+ */
+export function internalStatusApiKeyAuth(req: Request, res: Response, next: NextFunction): void {
+  const apiKey = process.env.INTERNAL_STATUS_API_KEY;
+
+  if (!apiKey) {
+    console.error('[Auth] INTERNAL_STATUS_API_KEY not configured in environment variables');
+    res.status(500).json({
+      error: 'Server configuration error',
+      message: 'Internal status API authentication is not properly configured'
+    });
+    return;
+  }
+
+  const clientApiKey = req.headers['x-internal-status-key'] as string;
+
+  if (!clientApiKey) {
+    console.warn('[Auth] Missing internal status API key in request');
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Internal status API key is required. Please provide X-Internal-Status-Key header.'
+    });
+    return;
+  }
+
+  if (clientApiKey !== apiKey) {
+    console.warn('[Auth] Invalid internal status API key attempt');
+    res.status(403).json({
+      error: 'Forbidden',
+      message: 'Invalid internal status API key'
+    });
+    return;
+  }
+
+  next();
+}

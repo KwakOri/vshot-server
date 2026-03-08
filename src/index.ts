@@ -10,7 +10,7 @@ import { ImageMerger } from './services/ImageMerger';
 import { V3RoomManager } from './services/v3/V3RoomManager.js';
 import { V3SignalingServer } from './services/v3/V3SignalingServer.js';
 import { createPhotoV3Router } from './routes/photo-v3.js';
-import { apiKeyAuth } from './middleware/apiKeyAuth';
+import { apiKeyAuth, internalStatusApiKeyAuth } from './middleware/apiKeyAuth';
 import { authRouter } from './routes/auth';
 import { festaRouter } from './routes/festa';
 import { framesRouter } from './routes/frames';
@@ -165,6 +165,7 @@ function getInternalStatusSnapshot() {
       supabaseConfigured: !!process.env.SUPABASE_URL,
       jwtConfigured: !!process.env.JWT_SECRET,
       apiKeyConfigured: !!process.env.API_KEY,
+      internalStatusApiKeyConfigured: !!process.env.INTERNAL_STATUS_API_KEY,
     },
     rooms: {
       v2: getV2StatusSnapshot(),
@@ -208,7 +209,7 @@ app.get('/', (req, res) => {
         session: 'GET /api/photo-v3/session/:roomId'
       },
       internal: {
-        status: 'GET /api/internal/status (API key required)',
+        status: 'GET /api/internal/status (X-Internal-Status-Key required)',
       },
       frames: {
         list: 'GET /api/frames',
@@ -235,7 +236,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/internal/status', apiKeyAuth, (req, res) => {
+app.get('/api/internal/status', internalStatusApiKeyAuth, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(getInternalStatusSnapshot());
 });
