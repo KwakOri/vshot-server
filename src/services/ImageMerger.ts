@@ -26,17 +26,30 @@ export class ImageMerger {
    * Save base64 image to R2
    * @returns R2 public URL
    */
-  async saveBase64Image(base64Data: string): Promise<{ url: string; fileId: string }> {
+  async saveBase64Image(
+    base64Data: string
+  ): Promise<{ url: string; fileId: string; buffer: Buffer; contentType: string }> {
+    const { buffer, contentType } = parseBase64Image(base64Data);
+    const uploaded = await this.saveImageBuffer(buffer, contentType);
+    return {
+      ...uploaded,
+      buffer,
+      contentType,
+    };
+  }
+
+  async saveImageBuffer(
+    buffer: Buffer,
+    contentType: string = 'image/png'
+  ): Promise<{ url: string; fileId: string }> {
     if (!isR2Configured()) {
       throw new Error('R2 storage is not configured');
     }
 
-    const base64String = base64Data.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64String, 'base64');
     const fileId = uuidv4();
     const objectKey = generateObjectKey(fileId);
 
-    await uploadToR2(objectKey, buffer, 'image/png');
+    await uploadToR2(objectKey, buffer, contentType);
 
     const url = getPublicFileUrl(objectKey);
     console.log(`[ImageMerger] Saved image to R2: ${objectKey}`);
@@ -125,4 +138,14 @@ export class ImageMerger {
     console.log(`[ImageMerger] Merged image uploaded to R2: ${objectKey}`);
     return { url, fileId };
   }
+}
+
+function parseBase64Image(base64Data: string): { buffer: Buffer; contentType: string } {
+  const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+  const contentType = match?.[1] || 'image/png';
+  const base64String = match?.[2] || base64Data;
+  return {
+    buffer: Buffer.from(base64String, 'base64'),
+    contentType,
+  };
 }

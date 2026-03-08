@@ -223,6 +223,21 @@ export class V3RoomManager {
     return true;
   }
 
+  updateSessionMergeStatus(roomId: string, mergeStatus: 'none' | 'provisional' | 'final'): boolean {
+    const session = this.getCurrentSession(roomId);
+    if (!session) return false;
+
+    session.mergeStatus = mergeStatus;
+
+    const room = this.rooms.get(roomId);
+    if (room) {
+      room.lastActivityAt = new Date();
+    }
+
+    console.log(`[V3RoomManager] Merge status updated for session: ${session.sessionId} -> ${mergeStatus}`);
+    return true;
+  }
+
   /**
    * Complete session with final frame result
    */
