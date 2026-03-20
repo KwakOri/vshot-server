@@ -22,7 +22,7 @@ export class V3SignalingServer {
   private clients: Map<string, Client> = new Map(); // userId -> Client
   private roomManager: V3RoomManager;
   private qrCountdownTimers: Map<string, ReturnType<typeof setTimeout>> = new Map(); // roomId -> timer
-  private readonly photoRedirectCountdownSeconds = 30;
+  private readonly photoRedirectCountdownSeconds = 40;
   private readonly festaQrCountdownSeconds = 40;
 
   constructor(roomManager: V3RoomManager) {
