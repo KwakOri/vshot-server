@@ -83,6 +83,9 @@ export class V3SignalingServer {
       case 'start-capture-v3':
         this.handleStartCapture(message);
         break;
+      case 'photo-processing-started-v3':
+        this.handlePhotoProcessingStarted(message);
+        break;
       case 'photo-uploaded-v3':
         this.handlePhotoUploaded(message);
         break;
@@ -416,6 +419,15 @@ export class V3SignalingServer {
       role,
       photoUrl,
     });
+  }
+
+  /**
+   * Handle early processing notification (upload/merge about to start)
+   */
+  private handlePhotoProcessingStarted(
+    message: Extract<SignalMessage, { type: 'photo-processing-started-v3' }>
+  ): void {
+    this.broadcastToRoom(message.roomId, message);
   }
 
   /**

@@ -43,6 +43,7 @@ export type SignalMessage =
   | { type: 'start-capture-v3'; roomId: string }
   | { type: 'countdown-tick-v3'; roomId: string; count: number }
   | { type: 'capture-now-v3'; roomId: string }
+  | { type: 'photo-processing-started-v3'; roomId: string; startedBy: 'host' | 'guest' }
   | { type: 'photo-uploaded-v3'; roomId: string; userId: string; role: 'host' | 'guest'; photoUrl: string }
   | { type: 'photos-merged-v3'; roomId: string; mergedPhotoUrl: string; mergeStatus: 'provisional' | 'final' }
   | { type: 'session-complete-v3'; roomId: string; sessionId: string; frameResultUrl: string }
