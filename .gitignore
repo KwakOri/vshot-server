@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+.env.production
+.env.production.local
 uploads/
 *.log
 .DS_Store

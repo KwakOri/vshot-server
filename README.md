@@ -110,7 +110,17 @@ STORAGE_PATH=./uploads
 
 ## Deployment
 
-### 🚀 Quick Deploy to Vultr
+### 🚀 Recommended: Docker + GitHub Actions
+
+현재 권장 배포 경로는 Docker Compose와 GitHub Actions입니다.
+
+- [Docker/Vultr 배포 가이드](./DOCKER-DEPLOYMENT.md)
+- `scripts/setup-docker-server.sh`로 Vultr Docker 환경 준비
+- `main` push 시 `.github/workflows/deploy.yml`이 GHCR image를 빌드하고 배포
+
+기존 Node/systemd 방식은 레거시 운영 경로로 남겨 두었으며, 신규 배포에는 사용하지 않습니다.
+
+### Legacy: Node/systemd deploy
 
 자동 배포 설정:
 
@@ -135,20 +145,21 @@ git push origin main
 
 ### GitHub Actions
 
-이 저장소는 GitHub Actions를 통한 자동 배포를 지원합니다:
+기존 문서의 systemd/PM2 배포 방식 대신 현재 workflow는 Docker image 배포를 사용합니다:
 
 - **트리거**: `main` 브랜치 push
-- **프로세스**: 빌드 → 전송 → 배포 → 재시작
-- **서비스 관리**: systemd 또는 PM2
+- **프로세스**: Docker build → GHCR push → Vultr pull → Compose 재시작
+- **서비스 관리**: Docker Compose
 
 ## Production Checklist
 
 배포 전 확인사항:
 
-- [ ] `.env` 파일 설정 완료
+- [ ] `/opt/vshot/.env.production` 설정 완료
 - [ ] `CORS_ORIGIN` 프로덕션 도메인으로 설정
-- [ ] `API_KEY` 강력한 값으로 설정
-- [ ] 방화벽 포트 개방 (3000/tcp)
+- [ ] `API_KEY`, `JWT_SECRET`, Supabase/R2 secret 설정
+- [ ] Docker Compose healthcheck 통과
+- [ ] reverse proxy가 `127.0.0.1:3000`과 WebSocket upgrade를 전달
 - [ ] TURN 서버 설정 (옵션)
 - [ ] SSL/TLS 인증서 설정 (권장)
 - [ ] 로그 모니터링 설정

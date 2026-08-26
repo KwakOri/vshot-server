@@ -1,0 +1,11 @@
+node_modules
+dist
+uploads
+.env
+.env.*
+!.env.production.example
+.git
+.github
+*.log
+Dockerfile
+docker-compose*.yml

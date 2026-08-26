@@ -27,10 +27,10 @@ const server = http.createServer(app);
 
 // Configuration
 const PORT = process.env.PORT || 3001;
-const CORS_ORIGINS = [
-  'http://localhost:3000',
-  'https://vshot.site',
-];
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 // Middleware
 app.use(cors({

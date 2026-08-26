@@ -1,5 +1,7 @@
 # VShot v2 서버 자동 배포 가이드
 
+> 신규 배포는 [DOCKER-DEPLOYMENT.md](./DOCKER-DEPLOYMENT.md)를 사용하세요. 이 문서는 기존 Node/systemd/PM2 방식의 레거시 참고 문서입니다.
+
 GitHub Actions를 통한 Vultr 서버 자동 배포 설정 가이드입니다.
 
 ## 📋 목차

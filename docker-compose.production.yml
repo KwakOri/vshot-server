@@ -1,0 +1,31 @@
+services:
+  vshot-server:
+    image: ${VSHOT_SERVER_IMAGE:-ghcr.io/replace-me/vshot-v2-server:latest}
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - vshot_uploads:/app/uploads
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3000/health')
+          .then(response => process.exit(response.ok ? 0 : 1))
+          .catch(() => process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  vshot_uploads:
