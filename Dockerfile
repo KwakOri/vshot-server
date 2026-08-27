@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig.json ./
+COPY .eslintrc.json ./
 COPY src ./src
 COPY assets ./assets
 
