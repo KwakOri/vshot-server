@@ -13,7 +13,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  IMAGE_REF: ghcr.io/${{ github.repository }}:${{ github.sha }}
+  IMAGE_REF: ghcr.io/kwakori/vshot-server:${{ github.sha }}
 
 jobs:
   build-and-deploy:
